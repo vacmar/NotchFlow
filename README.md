@@ -1,4 +1,4 @@
-# Dynamic Island for Mac
+# NotchFlow for Mac
 
 Open-source macOS floating Dynamic Island widget inspired by Apple Dynamic Island + Alcove-style hover expansion.
 
@@ -11,6 +11,8 @@ This repository includes an initial `M0` implementation:
 - Live now-playing metadata from system media session (title, artist, artwork, progress, timeline)
 - Progress strip + subtle waveform animation
 - Transport commands wired for Apple Music / Spotify fallback via AppleScript
+- Horizontal swipe on expanded island for previous/next track
+- Long title and subtitle lines scroll when content exceeds available width
 
 ## Tech stack
 
@@ -22,8 +24,19 @@ This repository includes an initial `M0` implementation:
 
 ```bash
 swift build
-swift run
+swift run NotchFlow
 ```
+
+## Build app and DMG
+
+```bash
+chmod +x scripts/package_dmg.sh
+./scripts/package_dmg.sh
+```
+
+Artifacts are generated in `dist/`:
+- `dist/NotchFlow.app`
+- `dist/NotchFlow.dmg`
 
 ## Roadmap
 

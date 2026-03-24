@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
+    @State private var permissionStatuses: [PermissionStatus] = []
+    @State private var refreshKey = UUID()
 
     private var selectedThemeMode: Binding<ThemeMode> {
         Binding {
@@ -13,18 +15,139 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Picker("Theme", selection: selectedThemeMode) {
-                ForEach(ThemeMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+            // Theme Section
+            Section("Appearance") {
+                Picker("Theme", selection: selectedThemeMode) {
+                    ForEach(ThemeMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
+                .pickerStyle(.segmented)
 
-            Text("System follows macOS appearance. Dark and Light force the island theme.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text("System follows macOS appearance. Dark and Light force the island theme.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Permissions Section
+            Section("Automation Permissions") {
+                if permissionStatuses.isEmpty {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(0.8, anchor: .center)
+                        Text("Checking permissions...")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                } else {
+                    // Required apps
+                    let requiredApps = permissionStatuses.filter { $0.isRequired }
+                    if !requiredApps.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Required")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                                .padding(.bottom, 4)
+                            
+                            VStack(spacing: 10) {
+                                ForEach(requiredApps.indices, id: \.self) { index in
+                                    let status = requiredApps[index]
+                                    HStack(spacing: 12) {
+                                        Image(systemName: status.icon)
+                                            .frame(width: 20)
+                                            .foregroundColor(status.isGranted ? .blue : .gray)
+
+                                        Text(status.displayName)
+                                            .font(.system(size: 13))
+
+                                        Spacer()
+
+                                        Toggle("", isOn: Binding(
+                                            get: { status.isGranted },
+                                            set: { _ in
+                                                PermissionsChecker.shared.openAutomationSettings()
+                                            }
+                                        ))
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Optional installed apps
+                    let optionalApps = permissionStatuses.filter { !$0.isRequired }
+                    if !optionalApps.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Detected & Optional")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                                .padding(.bottom, 4)
+                            
+                            VStack(spacing: 10) {
+                                ForEach(optionalApps.indices, id: \.self) { index in
+                                    let status = optionalApps[index]
+                                    HStack(spacing: 12) {
+                                        Image(systemName: status.icon)
+                                            .frame(width: 20)
+                                            .foregroundColor(status.isGranted ? .blue : .gray)
+
+                                        Text(status.displayName)
+                                            .font(.system(size: 13))
+
+                                        Spacer()
+
+                                        Toggle("", isOn: Binding(
+                                            get: { status.isGranted },
+                                            set: { _ in
+                                                PermissionsChecker.shared.openAutomationSettings()
+                                            }
+                                        ))
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                    }
+
+                    Button(action: refreshPermissions) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Refresh Status")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.top, 12)
+                }
+
+                Text("Click a toggle to open System Settings and grant permission. Only installed apps are shown.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(16)
         .frame(width: 420)
+        .onAppear {
+            loadPermissions()
+        }
+        .id(refreshKey)
+    }
+
+    private func loadPermissions() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let statuses = PermissionsChecker.shared.getPermissionStatus()
+            DispatchQueue.main.async {
+                permissionStatuses = statuses
+            }
+        }
+    }
+
+    private func refreshPermissions() {
+        permissionStatuses = []
+        refreshKey = UUID()
+        loadPermissions()
     }
 }

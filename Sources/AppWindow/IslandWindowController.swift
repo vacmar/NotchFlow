@@ -1,10 +1,17 @@
 import AppKit
+import Combine
 import SwiftUI
 
 final class IslandWindowController: NSWindowController {
     private let positioner = IslandWindowPositioner()
+    private let viewModel: IslandViewModel
+    private var expansionStateCancellable: AnyCancellable?
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
 
-    init<Content: View>(rootView: Content) {
+    init<Content: View>(rootView: Content, viewModel: IslandViewModel) {
+        self.viewModel = viewModel
+
         let centeredRoot = ZStack {
             rootView
         }
@@ -28,15 +35,27 @@ final class IslandWindowController: NSWindowController {
         panel.isOpaque = false
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
-        panel.ignoresMouseEvents = false
+        panel.ignoresMouseEvents = true
         panel.contentView = hostingView
 
         super.init(window: panel)
+
+        startExpansionStateObservation()
+        startGlobalHoverMonitoring()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+        }
     }
 
     func positionOnActiveScreen() {
@@ -46,5 +65,54 @@ final class IslandWindowController: NSWindowController {
             screen: NSScreen.main
         )
         window.setFrame(frame, display: true)
+    }
+
+    private func startExpansionStateObservation() {
+        expansionStateCancellable = viewModel.$isExpanded
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isExpanded in
+                self?.window?.ignoresMouseEvents = !isExpanded
+            }
+    }
+
+    private func startGlobalHoverMonitoring() {
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged]
+        ) { [weak self] _ in
+            self?.updateCollapsedHoverFromMouseLocation()
+        }
+
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged]
+        ) { [weak self] event in
+            self?.updateCollapsedHoverFromMouseLocation()
+            return event
+        }
+    }
+
+    private func updateCollapsedHoverFromMouseLocation() {
+        guard !viewModel.isExpanded else { return }
+        guard let activationFrame = bezelActivationFrame else { return }
+
+        let mouseLocation = NSEvent.mouseLocation
+        let isInActivationZone = activationFrame.contains(mouseLocation)
+
+        Task { @MainActor in
+            self.viewModel.setHovering(isInActivationZone)
+        }
+    }
+
+    private var bezelActivationFrame: CGRect? {
+        guard let window else { return nil }
+
+        let windowFrame = window.frame
+        let width: CGFloat = 148
+        let height: CGFloat = 14
+        let topOffset: CGFloat = 9
+
+        let x = windowFrame.midX - (width / 2)
+        let y = windowFrame.maxY - topOffset - height
+
+        return CGRect(x: x, y: y, width: width, height: height)
     }
 }

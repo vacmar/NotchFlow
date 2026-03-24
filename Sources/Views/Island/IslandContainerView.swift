@@ -6,7 +6,6 @@ struct IslandContainerView: View {
     @Environment(\.openSettings) private var openSettings
     @AppStorage("themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
-    @State private var isActivationZoneHovering = false
     @State private var isExpandedContentHovering = false
     @State private var collapseWorkItem: DispatchWorkItem?
 
@@ -49,6 +48,7 @@ struct IslandContainerView: View {
                         .blur(radius: 14)
                 )
                 .shadow(color: IslandGlassTheme.shadowColor(for: effectiveColorScheme), radius: 24, y: 6)
+                .allowsHitTesting(viewModel.isExpanded)
 
             if viewModel.isExpanded {
                 expandedBody
@@ -58,9 +58,11 @@ struct IslandContainerView: View {
                         isExpandedContentHovering = hovering
                         updateHoverState()
                     }
+                    .allowsHitTesting(true)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else {
                 collapsedBody
+                    .allowsHitTesting(true)
                     .transition(.opacity)
             }
         }
@@ -68,17 +70,6 @@ struct IslandContainerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(IslandAnimation.expand, value: viewModel.isExpanded)
         .preferredColorScheme(effectiveColorScheme)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(.black.opacity(0.001))
-                .frame(width: 220, height: 26)
-                .offset(y: 10)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    isActivationZoneHovering = hovering
-                    updateHoverState()
-                }
-        }
         .onAppear {
             systemAppearanceObserver.refresh()
         }
@@ -102,12 +93,14 @@ struct IslandContainerView: View {
                 .offset(x: albumShiftX, y: albumShiftY)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(viewModel.snapshot.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(IslandGlassTheme.primaryTextColor(for: effectiveColorScheme))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                ScrollingLineText(
+                    text: viewModel.snapshot.title,
+                    color: IslandGlassTheme.primaryTextColor(for: effectiveColorScheme),
+                    fontSize: 13,
+                    fontWeight: .semibold,
+                    scrollSpeed: 28,
+                    gap: 36
+                )
                     .help(viewModel.snapshot.title)
 
                 ScrollingSubtitleText(
@@ -160,6 +153,13 @@ struct IslandContainerView: View {
             .offset(y: 6)
         }
         .frame(maxHeight: .infinity, alignment: .center)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    viewModel.handleHorizontalSwipe(value.translation.width)
+                }
+        )
     }
 
     private var artwork: some View {
@@ -198,7 +198,7 @@ struct IslandContainerView: View {
     }
 
     private func updateHoverState() {
-        let shouldExpand = isActivationZoneHovering || isExpandedContentHovering
+        let shouldExpand = isExpandedContentHovering
 
         if shouldExpand {
             collapseWorkItem?.cancel()
@@ -211,7 +211,7 @@ struct IslandContainerView: View {
             viewModel.setHovering(false)
         }
         collapseWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
     }
 
     private var formattedElapsed: String {
@@ -282,6 +282,76 @@ private struct ScrollingSubtitleText: View {
     private var measuredTextWidth: CGFloat {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: fontSize)
+        ]
+        return NSString(string: text).size(withAttributes: attributes).width
+    }
+}
+
+private struct ScrollingLineText: View {
+    let text: String
+    let color: Color
+    let fontSize: CGFloat
+    let fontWeight: Font.Weight
+    let scrollSpeed: CGFloat
+    let gap: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            let availableWidth = geo.size.width
+            let contentWidth = measuredTextWidth
+            let shouldScroll = contentWidth > availableWidth
+            let travel = contentWidth + gap
+            let duration = max(6, Double(travel / max(1, scrollSpeed)))
+
+            Group {
+                if shouldScroll {
+                    TimelineView(.animation) { timeline in
+                        let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                        let phase = CGFloat(elapsed.truncatingRemainder(dividingBy: duration) / duration)
+                        let offset = -phase * travel
+
+                        HStack(spacing: gap) {
+                            lineText
+                            lineText
+                        }
+                        .offset(x: offset)
+                    }
+                } else {
+                    lineText
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .frame(width: availableWidth, alignment: .leading)
+            .clipped()
+        }
+        .frame(height: max(14, fontSize + 1))
+    }
+
+    private var lineText: some View {
+        Text(text)
+            .font(.system(size: fontSize, weight: fontWeight))
+            .foregroundStyle(color)
+            .fixedSize()
+    }
+
+    private var measuredTextWidth: CGFloat {
+        let nsWeight: NSFont.Weight = {
+            switch fontWeight {
+            case .ultraLight: return .ultraLight
+            case .thin: return .thin
+            case .light: return .light
+            case .regular: return .regular
+            case .medium: return .medium
+            case .semibold: return .semibold
+            case .bold: return .bold
+            case .heavy: return .heavy
+            case .black: return .black
+            default: return .regular
+            }
+        }()
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: nsWeight)
         ]
         return NSString(string: text).size(withAttributes: attributes).width
     }

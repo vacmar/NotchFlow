@@ -3,27 +3,26 @@ import SwiftUI
 struct WaveformView: View {
     let isPlaying: Bool
     let colorScheme: ColorScheme
-    @State private var phase: CGFloat = 0
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<12, id: \.self) { index in
-                Capsule()
-                    .fill(barColor)
-                    .frame(width: 2.5, height: barHeight(index: index))
+        TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+
+            HStack(spacing: 3) {
+                ForEach(0..<12, id: \.self) { index in
+                    Capsule()
+                        .fill(barColor)
+                        .frame(width: 2.5, height: barHeight(index: index, time: seconds))
+                }
             }
         }
         .frame(height: 18)
-        .onAppear {
-            withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
-                phase = .pi * 2
-            }
-        }
     }
 
-    private func barHeight(index: Int) -> CGFloat {
+    private func barHeight(index: Int, time: TimeInterval) -> CGFloat {
         guard isPlaying else { return 4 }
-        let base = sin(phase + CGFloat(index) * 0.6)
+        let phase = CGFloat(time) * 5.2
+        let base = sin(phase + CGFloat(index) * 0.65)
         return 6 + abs(base) * 10
     }
 

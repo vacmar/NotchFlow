@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "DynamicIsland",
+    name: "NotchFlow",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "DynamicIsland", targets: ["DynamicIsland"])
+        .executable(name: "NotchFlow", targets: ["NotchFlow"])
     ],
     targets: [
         .executableTarget(
-            name: "DynamicIsland",
+            name: "NotchFlow",
             path: "Sources"
         )
     ]
