@@ -1,49 +1,53 @@
 import AppKit
 import SwiftUI
 
-@MainActor
-final class SystemAppearanceObserver: ObservableObject {
+final class SystemAppearanceObserver: NSObject, ObservableObject {
     @Published private(set) var colorScheme: ColorScheme = .dark
 
-    private var appStateObserver: NSObjectProtocol?
-    private var distributedAppearanceObserver: NSObjectProtocol?
-
-    init() {
+    override init() {
+        super.init()
         refresh()
 
-        appStateObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
             object: NSApp,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.refresh()
-            }
-        }
+        )
 
-        distributedAppearanceObserver = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleAppearanceChanged),
+            name: Notification.Name("AppleInterfaceThemeChangedNotification"),
             object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.refresh()
-            }
-        }
+        )
     }
 
     deinit {
-        if let appStateObserver {
-            NotificationCenter.default.removeObserver(appStateObserver)
-        }
-        if let distributedAppearanceObserver {
-            DistributedNotificationCenter.default().removeObserver(distributedAppearanceObserver)
-        }
+        NotificationCenter.default.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
     }
 
     func refresh() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.refresh()
+            }
+            return
+        }
+
         let effectiveAppearance = NSApp.effectiveAppearance
         let matchedAppearance = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
         colorScheme = matchedAppearance == .darkAqua ? .dark : .light
+    }
+
+    @objc
+    private func handleAppDidBecomeActive() {
+        refresh()
+    }
+
+    @objc
+    private func handleAppearanceChanged() {
+        refresh()
     }
 }

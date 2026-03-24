@@ -3,7 +3,6 @@ import SwiftUI
 
 struct IslandContainerView: View {
     @ObservedObject var viewModel: IslandViewModel
-    @Environment(\.openSettings) private var openSettings
     @AppStorage("themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("glassThemeStyle") private var glassThemeStyleRawValue = GlassThemeStyle.frosted.rawValue
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
@@ -194,7 +193,7 @@ struct IslandContainerView: View {
                         style: waveformStyle
                     )
                     Button {
-                        openSettings()
+                        openSettingsWindow()
                         centerSettingsWindow()
                     } label: {
                         Image(systemName: "gearshape")
@@ -260,6 +259,10 @@ struct IslandContainerView: View {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
         }
+    }
+
+    private func openSettingsWindow() {
+        NotificationCenter.default.post(name: .notchFlowOpenSettingsRequested, object: nil)
     }
 
     private func updateHoverState() {

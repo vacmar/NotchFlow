@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let notchFlowOpenSettingsRequested = Notification.Name("NotchFlowOpenSettingsRequested")
+}
+
 @main
 struct NotchFlowApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -14,12 +18,21 @@ struct NotchFlowApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var islandWindowController: IslandWindowController?
     private var setupWindowController: NSWindowController?
+    private var settingsWindowController: NSWindowController?
     private var statusItem: NSStatusItem?
+    private var openSettingsObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         setupAppMenu()
         setupStatusMenu()
+        openSettingsObserver = NotificationCenter.default.addObserver(
+            forName: .notchFlowOpenSettingsRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.openSettingsWindow()
+        }
         NSApp.activate(ignoringOtherApps: true)
 
         let viewModel = IslandViewModel()
@@ -38,6 +51,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.positionOnActiveScreen()
 
         islandWindowController = controller
+    }
+
+    deinit {
+        if let openSettingsObserver {
+            NotificationCenter.default.removeObserver(openSettingsObserver)
+        }
     }
 
     private func setupAppMenu() {
@@ -71,11 +90,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc
-    private func openSettingsWindow() {
-        if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
-            _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+    func openSettingsWindow() {
+        if let controller = settingsWindowController,
+           let window = controller.window {
+            positionWindowOnCurrentScreen(window)
+            controller.showWindow(nil)
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
         }
+
+        let settingsView = SettingsView()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 760),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.title = "NotchFlow Settings"
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        window.contentView = NSHostingView(rootView: settingsView)
+        positionWindowOnCurrentScreen(window)
+
+        let controller = NSWindowController(window: window)
+        settingsWindowController = controller
+        controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func positionWindowOnCurrentScreen(_ window: NSWindow) {
+        let mouseLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) })
+            ?? NSScreen.main
+
+        guard let screen = targetScreen else { return }
+
+        let visibleFrame = screen.visibleFrame
+        let windowSize = window.frame.size
+        let origin = NSPoint(
+            x: visibleFrame.midX - (windowSize.width / 2),
+            y: visibleFrame.midY - (windowSize.height / 2)
+        )
+
+        window.setFrameOrigin(origin)
     }
 
     @objc
