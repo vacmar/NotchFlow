@@ -70,12 +70,43 @@ chmod +x scripts/package_dmg.sh
 ./scripts/package_dmg.sh
 ```
 
+For Developer ID signing (recommended for public releases):
+
+```bash
+export SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+./scripts/package_dmg.sh
+```
+
 Output artifacts:
 
 - dist/NotchFlow.app
 - dist/NotchFlow.dmg
 
 The DMG is built with drag-to-Applications layout (includes an Applications shortcut and icon positioning).
+
+## Notarization (works with private repos)
+
+Notarization is local-to-your-Mac and Apple Developer account. Your GitHub repo can stay private.
+
+1) Export notarization credentials:
+
+```bash
+export APPLE_ID="you@example.com"
+export APPLE_TEAM_ID="YOURTEAMID"
+export APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+```
+
+2) Notarize a generated DMG:
+
+```bash
+./scripts/notarize.sh dist/NotchFlow.dmg
+```
+
+Or notarize during release build:
+
+```bash
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARIZE=1 ./scripts/release.sh 1.0.0
+```
 
 ## Release process
 
@@ -84,6 +115,12 @@ Create a versioned release bundle:
 ```bash
 chmod +x scripts/release.sh
 ./scripts/release.sh 0.1.0
+```
+
+Optional notarized release:
+
+```bash
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARIZE=1 ./scripts/release.sh 1.0.0
 ```
 
 This generates:

@@ -12,6 +12,8 @@ DMG_PATH="$DIST_DIR/$APP_NAME.dmg"
 BIN_PATH="$BUILD_DIR/$APP_NAME"
 RW_DMG_PATH="$DIST_DIR/$APP_NAME-rw.dmg"
 ICON_PATH="$ROOT_DIR/Assets/AppIcon.icns"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-$ROOT_DIR/scripts/NotchFlow.entitlements}"
 
 echo "Building release binary..."
 cd "$ROOT_DIR"
@@ -65,8 +67,17 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-echo "Ad-hoc signing app bundle..."
-codesign --force --deep --sign - "$APP_DIR"
+if [[ "$SIGN_IDENTITY" == "-" ]]; then
+  echo "Ad-hoc signing app bundle..."
+  codesign --force --deep --sign - "$APP_DIR"
+else
+  echo "Signing app bundle with identity: $SIGN_IDENTITY"
+  SIGN_ARGS=(--force --deep --timestamp --options runtime --sign "$SIGN_IDENTITY")
+  if [[ -f "$ENTITLEMENTS_PATH" ]]; then
+    SIGN_ARGS+=(--entitlements "$ENTITLEMENTS_PATH")
+  fi
+  codesign "${SIGN_ARGS[@]}" "$APP_DIR"
+fi
 
 echo "Creating DMG..."
 mkdir -p "$DIST_DIR"

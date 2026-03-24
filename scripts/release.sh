@@ -8,6 +8,7 @@ VERSION="${1:-0.1.0}"
 TAG="v$VERSION"
 RELEASE_DIR="$ROOT_DIR/release/$TAG"
 DIST_DIR="$ROOT_DIR/dist"
+NOTARIZE="${NOTARIZE:-0}"
 
 echo "Preparing release $TAG"
 mkdir -p "$RELEASE_DIR"
@@ -23,6 +24,11 @@ DMG_TARGET="$RELEASE_DIR/NotchFlow-$TAG.dmg"
 rm -rf "$APP_TARGET"
 cp -R "$APP_SOURCE" "$APP_TARGET"
 cp "$DMG_SOURCE" "$DMG_TARGET"
+
+if [[ "$NOTARIZE" == "1" ]]; then
+	echo "Notarizing release DMG..."
+	./scripts/notarize.sh "$DMG_TARGET"
+fi
 
 shasum -a 256 "$DMG_TARGET" > "$RELEASE_DIR/NotchFlow-$TAG.dmg.sha256"
 
