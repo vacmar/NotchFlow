@@ -88,6 +88,15 @@ The DMG is built with drag-to-Applications layout (includes an Applications shor
 
 Notarization is local-to-your-Mac and Apple Developer account. Your GitHub repo can stay private.
 
+### Current signing status
+
+NotchFlow is currently released without Apple Developer ID notarization due to funding limitations.
+
+- Current builds are ad-hoc signed.
+- macOS Gatekeeper may show a warning on first launch.
+- If warned, users can right-click NotchFlow in Applications and choose Open.
+- Full Developer ID signing + notarization workflow is already included in `scripts/` and can be enabled once funding is available.
+
 1) Export notarization credentials:
 
 ```bash
