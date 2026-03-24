@@ -22,14 +22,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusMenu()
         NSApp.activate(ignoringOtherApps: true)
 
+        let viewModel = IslandViewModel()
+
         // Check if setup has been completed
         let setupCompleted = UserDefaults.standard.bool(forKey: "PermissionsSetupCompleted")
         
         if !setupCompleted {
-            showPermissionsSetup()
+            showPermissionsSetup(viewModel: viewModel)
         }
 
-        let viewModel = IslandViewModel()
         let contentView = IslandContainerView(viewModel: viewModel)
         let controller = IslandWindowController(rootView: contentView, viewModel: viewModel)
 
@@ -82,8 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
-    private func showPermissionsSetup() {
-        let setupView = PermissionsSetupView()
+    private func showPermissionsSetup(viewModel: IslandViewModel) {
+        let setupView = PermissionsSetupView(viewModel: viewModel)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 550),
             styleMask: [.titled, .closable],

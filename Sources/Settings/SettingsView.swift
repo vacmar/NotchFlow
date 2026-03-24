@@ -6,14 +6,17 @@ struct SettingsView: View {
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
     @State private var permissionStatuses: [PermissionStatus] = []
     @State private var refreshKey = UUID()
+    @State private var lastRefreshedAt = Date()
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
 
     private let labelColumnWidth: CGFloat = 86
     private let rowHorizontalSpacing: CGFloat = 12
-    private let appearanceRowSpacing: CGFloat = 14
+    private let appearanceRowSpacing: CGFloat = 16
     private let sectionBlockSpacing: CGFloat = 16
-    private let permissionGroupSpacing: CGFloat = 10
+    private let permissionGroupSpacing: CGFloat = 12
     private let permissionCardRowHeight: CGFloat = 40
+    private let gestureRowSpacing: CGFloat = 14
+    private let segmentedControlWidth: CGFloat = 300
 
     private var selectedThemeMode: Binding<ThemeMode> {
         Binding {
@@ -74,132 +77,203 @@ struct SettingsView: View {
         effectiveColorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.08)
     }
 
+    private var sectionCardBackground: Color {
+        effectiveColorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03)
+    }
+
+    private var sectionCardBorder: Color {
+        effectiveColorScheme == .dark ? Color.white.opacity(0.11) : Color.black.opacity(0.09)
+    }
+
     var body: some View {
         Form {
             // Theme Section
             Section {
-                VStack(alignment: .leading, spacing: appearanceRowSpacing) {
-                    HStack(alignment: .center, spacing: rowHorizontalSpacing) {
-                        Text("Theme")
-                            .foregroundStyle(primaryTextColor)
-                            .frame(width: labelColumnWidth, alignment: .leading)
+                sectionCard {
+                    VStack(alignment: .leading, spacing: appearanceRowSpacing) {
+                        HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                            Text("Theme")
+                                .foregroundStyle(primaryTextColor)
+                                .frame(width: labelColumnWidth, alignment: .leading)
 
-                        Picker("", selection: selectedThemeMode) {
-                            ForEach(ThemeMode.allCases) { mode in
-                                Text(mode.title)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.85)
-                                    .tag(mode)
+                            Picker("", selection: selectedThemeMode) {
+                                ForEach(ThemeMode.allCases) { mode in
+                                    Text(mode.title)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                        .tag(mode)
+                                }
                             }
+                            .frame(width: segmentedControlWidth, alignment: .leading)
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                    }
 
-                    Text("System follows macOS appearance. Dark and Light force the island theme.")
-                        .font(.caption)
-                        .foregroundStyle(secondaryTextColor)
-                        .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text("System follows macOS appearance. Dark and Light force the island theme.")
+                            .font(.caption)
+                            .foregroundStyle(secondaryTextColor)
+                            .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                    HStack(alignment: .center, spacing: rowHorizontalSpacing) {
-                        Text("Glass")
-                            .foregroundStyle(primaryTextColor)
-                            .frame(width: labelColumnWidth, alignment: .leading)
+                        HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                            Text("Glass")
+                                .foregroundStyle(primaryTextColor)
+                                .frame(width: labelColumnWidth, alignment: .leading)
 
-                        Picker("", selection: selectedGlassThemeStyle) {
-                            ForEach(GlassThemeStyle.allCases) { style in
-                                Text(style.title)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.9)
-                                    .tag(style)
+                            Picker("", selection: selectedGlassThemeStyle) {
+                                ForEach(GlassThemeStyle.allCases) { style in
+                                    Text(style.title)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.9)
+                                        .tag(style)
+                                }
                             }
+                            .frame(width: segmentedControlWidth, alignment: .leading)
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                    }
 
-                    HStack(alignment: .center, spacing: rowHorizontalSpacing) {
-                        Text("Waveform")
-                            .foregroundStyle(primaryTextColor)
-                            .frame(width: labelColumnWidth, alignment: .leading)
+                        HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                            Text("Waveform")
+                                .foregroundStyle(primaryTextColor)
+                                .frame(width: labelColumnWidth, alignment: .leading)
 
-                        Picker("", selection: selectedWaveformStyle) {
-                            ForEach(WaveformStyle.allCases) { style in
-                                Text(style.title)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.9)
-                                    .tag(style)
+                            Picker("", selection: selectedWaveformStyle) {
+                                ForEach(WaveformStyle.allCases) { style in
+                                    Text(style.title)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.9)
+                                        .tag(style)
+                                }
                             }
+                            .frame(width: segmentedControlWidth, alignment: .leading)
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             } header: {
                 Text("Appearance")
                     .foregroundStyle(primaryTextColor)
             }
 
-            // Permissions Section
             Section {
-                if permissionStatuses.isEmpty {
-                    HStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(0.8, anchor: .center)
-                        Text("Checking permissions...")
-                            .font(.system(size: 13))
+                sectionCard {
+                    VStack(alignment: .leading, spacing: gestureRowSpacing) {
+                        settingsGestureRow(
+                            icon: "cursorarrow.motionlines",
+                            title: "Hover near the notch to expand and collapse",
+                            detail: "Move your cursor to the top center near the notch area"
+                        )
+
+                        settingsGestureRow(
+                            icon: "arrow.left.and.right.circle",
+                            title: "Swipe on the island to change track",
+                            detail: "Left = next track, Right = previous track"
+                        )
+
+                        settingsGestureRow(
+                            icon: "hand.draw",
+                            title: "Two-finger horizontal swipe also works",
+                            detail: "Use a trackpad swipe while the expanded island is visible"
+                        )
+
+                        settingsGestureRow(
+                            icon: "app.badge",
+                            title: "Click album artwork to open source app",
+                            detail: "Launches Spotify, Apple Music, or the active browser source"
+                        )
+
+                        settingsGestureRow(
+                            icon: "gearshape",
+                            title: "Use the gear icon for quick settings",
+                            detail: "Open Settings directly from the expanded island"
+                        )
+
+                        Text("These controls are available anytime while NotchFlow is running.")
+                            .font(.caption)
                             .foregroundStyle(secondaryTextColor)
-                    }
-                    .padding(.vertical, 8)
-                } else {
-                    VStack(alignment: .leading, spacing: sectionBlockSpacing) {
-                        let requiredApps = permissionStatuses.filter { $0.isRequired }
-                        if !requiredApps.isEmpty {
-                            VStack(alignment: .leading, spacing: permissionGroupSpacing) {
-                                Text("Required")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(secondaryTextColor)
-                                    .padding(.leading, 2)
-
-                                permissionGroupRows(requiredApps)
-                            }
-                        }
-
-                        let optionalApps = permissionStatuses.filter { !$0.isRequired }
-                        if !optionalApps.isEmpty {
-                            VStack(alignment: .leading, spacing: permissionGroupSpacing) {
-                                Text("Detected & Optional")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(secondaryTextColor)
-                                    .padding(.leading, 2)
-
-                                permissionGroupRows(optionalApps)
-                            }
-                        }
-
-                        Button(action: refreshPermissions) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Refresh Status")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .foregroundStyle(primaryTextColor)
-                        }
-                        .buttonStyle(.bordered)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
                     }
                 }
+            } header: {
+                Text("Gestures")
+                    .foregroundStyle(primaryTextColor)
+            }
 
-                Text("Click a toggle to open System Settings and grant permission. Only installed apps are shown.")
-                    .font(.caption)
-                    .foregroundStyle(secondaryTextColor)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
+            // Permissions Section
+            Section {
+                sectionCard {
+                    if permissionStatuses.isEmpty {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .scaleEffect(0.8, anchor: .center)
+                            Text("Checking permissions...")
+                                .font(.system(size: 13))
+                                .foregroundStyle(secondaryTextColor)
+                        }
+                        .padding(.vertical, 8)
+                    } else {
+                        VStack(alignment: .leading, spacing: sectionBlockSpacing) {
+                            let requiredIndices = permissionStatuses.indices.filter { permissionStatuses[$0].isRequired }
+                            if !requiredIndices.isEmpty {
+                                VStack(alignment: .leading, spacing: permissionGroupSpacing) {
+                                    Text("Required")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(secondaryTextColor)
+                                        .padding(.leading, 2)
+
+                                    permissionGroupRows(requiredIndices)
+                                }
+                            }
+
+                            let optionalIndices = permissionStatuses.indices.filter { !permissionStatuses[$0].isRequired }
+                            if !optionalIndices.isEmpty {
+                                VStack(alignment: .leading, spacing: permissionGroupSpacing) {
+                                    Text("Detected & Optional")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(secondaryTextColor)
+                                        .padding(.leading, 2)
+
+                                    permissionGroupRows(optionalIndices)
+                                }
+                            }
+
+                            Button(action: refreshPermissions) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Refresh Status")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(primaryTextColor)
+                            }
+                            .buttonStyle(.bordered)
+
+                            Text("Managed in System Settings → Privacy & Security → Automation")
+                                .font(.caption2)
+                                .foregroundStyle(secondaryTextColor)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Text("Last refreshed: \(formattedLastRefresh)")
+                                .font(.caption2)
+                                .foregroundStyle(secondaryTextColor)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    Text("Click a toggle to open System Settings and grant permission. Only installed apps are shown.")
+                        .font(.caption)
+                        .foregroundStyle(secondaryTextColor)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } header: {
                 Text("Automation Permissions")
                     .foregroundStyle(primaryTextColor)
@@ -227,6 +301,7 @@ struct SettingsView: View {
             let statuses = PermissionsChecker.shared.getPermissionStatus()
             DispatchQueue.main.async {
                 permissionStatuses = statuses
+                lastRefreshedAt = Date()
             }
         }
     }
@@ -237,39 +312,72 @@ struct SettingsView: View {
         loadPermissions()
     }
 
-    @ViewBuilder
-    private func permissionGroupRows(_ statuses: [PermissionStatus]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(statuses.indices, id: \.self) { index in
-                permissionRow(statuses[index])
+    private func settingsGestureRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 16, alignment: .center)
+                .foregroundColor(Color.blue.opacity(0.92))
+                .padding(.top, 1)
 
-                if index < statuses.count - 1 {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(primaryTextColor)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(detail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(secondaryTextColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func permissionGroupRows(_ indices: [Int]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(indices.indices, id: \.self) { groupIndex in
+                let sourceIndex = indices[groupIndex]
+                permissionRow(sourceIndex)
+
+                if groupIndex < indices.count - 1 {
                     Divider()
                         .overlay(permissionCardDivider)
-                        .padding(.leading, 40)
+                        .padding(.leading, 44)
                 }
             }
         }
         .background(permissionCardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(sectionCardBorder.opacity(0.75), lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
-    private func permissionRow(_ status: PermissionStatus) -> some View {
+    private func permissionRow(_ index: Int) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: status.icon)
+            Image(systemName: permissionStatuses[index].icon)
                 .frame(width: 20)
-                .foregroundColor(status.isGranted ? .blue : .gray)
+                .foregroundColor(permissionStatuses[index].isGranted ? .blue : .gray)
 
-            Text(status.displayName)
+            Text(permissionStatuses[index].displayName)
                 .font(.system(size: 13))
                 .foregroundStyle(primaryTextColor)
 
             Spacer(minLength: 12)
 
             Toggle("", isOn: Binding(
-                get: { status.isGranted },
-                set: { _ in
+                get: { permissionStatuses[index].isGranted },
+                set: { newValue in
+                    permissionStatuses[index].isGranted = newValue
                     PermissionsChecker.shared.openAutomationSettings()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        refreshPermissions()
+                    }
                 }
             ))
             .labelsHidden()
@@ -278,5 +386,23 @@ struct SettingsView: View {
         }
         .frame(height: permissionCardRowHeight)
         .padding(.horizontal, 12)
+    }
+
+    private var formattedLastRefresh: String {
+        lastRefreshedAt.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(sectionCardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(sectionCardBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

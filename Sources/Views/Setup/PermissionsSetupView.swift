@@ -1,9 +1,31 @@
 import SwiftUI
 
 struct PermissionsSetupView: View {
+    @ObservedObject var viewModel: IslandViewModel
     @State private var currentStep = 0
     @State private var installedBrowsers: [String] = []
     @Environment(\.dismiss) var dismiss
+
+    private var totalSteps: Int { 4 }
+
+    private var isPreferredSourceActive: Bool {
+        viewModel.isPreferredSourceActive
+    }
+
+    private var sourceDisplayName: String {
+        switch viewModel.snapshot.source {
+        case .spotify:
+            return "Spotify"
+        case .music:
+            return "Apple Music"
+        case .browser:
+            return "Browser"
+        case .system:
+            return "System"
+        case .none:
+            return "None"
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -38,8 +60,10 @@ struct PermissionsSetupView: View {
                     setupStep0
                 } else if currentStep == 1 {
                     setupStep1
-                } else {
+                } else if currentStep == 2 {
                     setupStep2
+                } else {
+                    setupStep3
                 }
 
                 Spacer()
@@ -55,7 +79,7 @@ struct PermissionsSetupView: View {
 
                     Spacer()
 
-                    if currentStep < 2 {
+                    if currentStep < totalSteps - 1 {
                         Button("Next") {
                             currentStep += 1
                         }
@@ -65,6 +89,7 @@ struct PermissionsSetupView: View {
                             UserDefaults.standard.set(true, forKey: "PermissionsSetupCompleted")
                             dismiss()
                         }
+                        .disabled(!viewModel.gestureOnboardingCompleted)
                         .keyboardShortcut(.defaultAction)
                     }
                 }
@@ -138,9 +163,44 @@ struct PermissionsSetupView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 20))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Quick Gestures")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Hover to expand, swipe left/right to change tracks, and click artwork to open the source app")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             .padding(16)
             .background(Color(nsColor: .separatorColor).opacity(0.3))
+            .cornerRadius(8)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Basic Gestures")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Label("Hover near the notch to expand or collapse", systemImage: "cursorarrow.motionlines")
+                    .font(.system(size: 12))
+
+                Label("Swipe left/right on the island to skip tracks", systemImage: "arrow.left.and.right.circle")
+                    .font(.system(size: 12))
+
+                Label("Two-finger horizontal swipe also changes tracks", systemImage: "hand.draw")
+                    .font(.system(size: 12))
+
+                Label("Click album artwork to open Spotify, Music, or browser source", systemImage: "app.badge")
+                    .font(.system(size: 12))
+            }
+            .foregroundColor(.secondary)
+            .padding(14)
+            .background(Color(nsColor: .separatorColor).opacity(0.2))
             .cornerRadius(8)
 
             Text("To enable these features, we need automation permissions for Safari and Apple Music (required), plus any other browsers you've installed.")
@@ -292,6 +352,88 @@ struct PermissionsSetupView: View {
 
             Spacer()
         }
+    }
+
+    // Step 3: Gesture Onboarding
+    var setupStep3: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Practice Gestures")
+                .font(.system(size: 14, weight: .semibold))
+
+            Text("Complete each step in order to finish setup.")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+
+            VStack(alignment: .leading, spacing: 10) {
+                onboardingRow(
+                    title: "Use Spotify or Apple Music",
+                    description: "Current source: \(sourceDisplayName)",
+                    isDone: isPreferredSourceActive,
+                    isCurrent: viewModel.gestureOnboardingStep == .requirePreferredSource
+                )
+
+                onboardingRow(
+                    title: "Hover the notch to expand",
+                    description: "Move cursor near notch until island expands",
+                    isDone: viewModel.gestureOnboardingStep.rawValue > GestureOnboardingStep.hoverToExpand.rawValue,
+                    isCurrent: viewModel.gestureOnboardingStep == .hoverToExpand
+                )
+
+                onboardingRow(
+                    title: "Swipe left",
+                    description: "Swipe left on expanded island to skip next",
+                    isDone: viewModel.gestureOnboardingStep.rawValue > GestureOnboardingStep.swipeLeft.rawValue,
+                    isCurrent: viewModel.gestureOnboardingStep == .swipeLeft
+                )
+
+                onboardingRow(
+                    title: "Swipe right",
+                    description: "Swipe right on expanded island to go previous",
+                    isDone: viewModel.gestureOnboardingStep.rawValue > GestureOnboardingStep.swipeRight.rawValue,
+                    isCurrent: viewModel.gestureOnboardingStep == .swipeRight
+                )
+
+                onboardingRow(
+                    title: "Open source app",
+                    description: "Click album artwork to open Spotify/Apple Music",
+                    isDone: viewModel.gestureOnboardingCompleted,
+                    isCurrent: viewModel.gestureOnboardingStep == .openSourceApp
+                )
+            }
+
+            if !isPreferredSourceActive {
+                Text("Start playback in Spotify or Apple Music to continue gesture onboarding.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            }
+
+            Spacer()
+        }
+    }
+
+    private func onboardingRow(title: String, description: String, isDone: Bool, isCurrent: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: isDone ? "checkmark.circle.fill" : (isCurrent ? "circle.dotted" : "circle"))
+                .foregroundColor(isDone ? .green : (isCurrent ? .blue : .secondary))
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 18, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: isCurrent ? .semibold : .regular))
+                Text(description)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .separatorColor).opacity(isCurrent ? 0.28 : 0.18))
+        )
     }
 
     private func openSystemSettingsAutomation() {

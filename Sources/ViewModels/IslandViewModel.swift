@@ -1,9 +1,20 @@
 import SwiftUI
 
+enum GestureOnboardingStep: Int {
+    case requirePreferredSource
+    case hoverToExpand
+    case swipeLeft
+    case swipeRight
+    case openSourceApp
+    case completed
+}
+
 @MainActor
 final class IslandViewModel: ObservableObject {
     @Published var isExpanded = false
     @Published var snapshot: NowPlayingSnapshot = .placeholder
+    @Published var gestureOnboardingStep: GestureOnboardingStep = .requirePreferredSource
+    @Published var gestureOnboardingCompleted = false
 
     private let nowPlayingService = SystemNowPlayingService()
     private var pollingTask: Task<Void, Never>?
@@ -21,9 +32,22 @@ final class IslandViewModel: ObservableObject {
         pollingTask?.cancel()
     }
 
+    var isPreferredSourceActive: Bool {
+        switch snapshot.source {
+        case .spotify, .music:
+            return true
+        case .none, .browser, .system:
+            return false
+        }
+    }
+
     func setHovering(_ hovering: Bool) {
         withAnimation(hovering ? IslandAnimation.expand : IslandAnimation.collapse) {
             isExpanded = hovering
+        }
+
+        if hovering {
+            advanceOnboardingAfterHover()
         }
     }
 
@@ -59,10 +83,12 @@ final class IslandViewModel: ObservableObject {
     }
 
     func next() {
+        registerSwipeLeft()
         nowPlayingService.nextTrack(source: snapshot.source)
     }
 
     func previous() {
+        registerSwipeRight()
         nowPlayingService.previousTrack(source: snapshot.source)
     }
 
@@ -76,6 +102,7 @@ final class IslandViewModel: ObservableObject {
     }
 
     func openCurrentSourceApp() {
+        registerOpenSourceApp()
         nowPlayingService.openSourceApp(source: snapshot.source)
     }
 
@@ -103,8 +130,71 @@ final class IslandViewModel: ObservableObject {
                 }
 
                 self.snapshot = latest
+                self.refreshOnboardingStepFromCurrentSource()
                 try? await Task.sleep(for: .milliseconds(250))
             }
+        }
+    }
+
+    private func refreshOnboardingStepFromCurrentSource() {
+        guard !gestureOnboardingCompleted else { return }
+
+        if !isPreferredSourceActive {
+            gestureOnboardingStep = .requirePreferredSource
+            return
+        }
+
+        if gestureOnboardingStep == .requirePreferredSource {
+            gestureOnboardingStep = .hoverToExpand
+        }
+    }
+
+    private func advanceOnboardingAfterHover() {
+        guard !gestureOnboardingCompleted else { return }
+        guard isPreferredSourceActive else {
+            gestureOnboardingStep = .requirePreferredSource
+            return
+        }
+
+        if gestureOnboardingStep == .hoverToExpand {
+            gestureOnboardingStep = .swipeLeft
+        }
+    }
+
+    private func registerSwipeLeft() {
+        guard !gestureOnboardingCompleted else { return }
+        guard isPreferredSourceActive else {
+            gestureOnboardingStep = .requirePreferredSource
+            return
+        }
+
+        if gestureOnboardingStep == .swipeLeft {
+            gestureOnboardingStep = .swipeRight
+        }
+    }
+
+    private func registerSwipeRight() {
+        guard !gestureOnboardingCompleted else { return }
+        guard isPreferredSourceActive else {
+            gestureOnboardingStep = .requirePreferredSource
+            return
+        }
+
+        if gestureOnboardingStep == .swipeRight {
+            gestureOnboardingStep = .openSourceApp
+        }
+    }
+
+    private func registerOpenSourceApp() {
+        guard !gestureOnboardingCompleted else { return }
+        guard isPreferredSourceActive else {
+            gestureOnboardingStep = .requirePreferredSource
+            return
+        }
+
+        if gestureOnboardingStep == .openSourceApp {
+            gestureOnboardingStep = .completed
+            gestureOnboardingCompleted = true
         }
     }
 }
