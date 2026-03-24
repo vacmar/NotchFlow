@@ -79,26 +79,30 @@ final class IslandWindowController: NSWindowController {
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged]
         ) { [weak self] _ in
-            self?.updateCollapsedHoverFromMouseLocation()
+            self?.updateHoverFromMouseLocation()
         }
 
         localMouseMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged]
         ) { [weak self] event in
-            self?.updateCollapsedHoverFromMouseLocation()
+            self?.updateHoverFromMouseLocation()
             return event
         }
     }
 
-    private func updateCollapsedHoverFromMouseLocation() {
-        guard !viewModel.isExpanded else { return }
+    private func updateHoverFromMouseLocation() {
+        guard let window else { return }
         guard let activationFrame = bezelActivationFrame else { return }
 
         let mouseLocation = NSEvent.mouseLocation
         let isInActivationZone = activationFrame.contains(mouseLocation)
+        let isInsideExpandedFrame = window.frame.contains(mouseLocation)
+        let shouldExpand = viewModel.isExpanded
+            ? (isInsideExpandedFrame || isInActivationZone)
+            : isInActivationZone
 
         Task { @MainActor in
-            self.viewModel.setHovering(isInActivationZone)
+            self.viewModel.setHovering(shouldExpand)
         }
     }
 

@@ -4,6 +4,7 @@ struct SettingsView: View {
     @AppStorage("themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @State private var permissionStatuses: [PermissionStatus] = []
     @State private var refreshKey = UUID()
+    @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
 
     private var selectedThemeMode: Binding<ThemeMode> {
         Binding {
@@ -13,31 +14,64 @@ struct SettingsView: View {
         }
     }
 
+    private var themeMode: ThemeMode {
+        ThemeMode.from(themeModeRawValue)
+    }
+
+    private var effectiveColorScheme: ColorScheme {
+        switch themeMode {
+        case .system:
+            return systemAppearanceObserver.colorScheme
+        case .dark:
+            return .dark
+        case .light:
+            return .light
+        }
+    }
+
+    private var primaryTextColor: Color {
+        IslandGlassTheme.primaryTextColor(for: effectiveColorScheme)
+    }
+
+    private var secondaryTextColor: Color {
+        IslandGlassTheme.secondaryTextColor(for: effectiveColorScheme)
+    }
+
+    private var settingsBackgroundColor: Color {
+        effectiveColorScheme == .dark ? Color.black.opacity(0.82) : Color.white
+    }
+
     var body: some View {
         Form {
             // Theme Section
-            Section("Appearance") {
-                Picker("Theme", selection: selectedThemeMode) {
+            Section {
+                Picker(selection: selectedThemeMode) {
                     ForEach(ThemeMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
+                } label: {
+                    Text("Theme")
+                        .foregroundStyle(primaryTextColor)
                 }
                 .pickerStyle(.segmented)
 
                 Text("System follows macOS appearance. Dark and Light force the island theme.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryTextColor)
+            } header: {
+                Text("Appearance")
+                    .foregroundStyle(primaryTextColor)
             }
 
             // Permissions Section
-            Section("Automation Permissions") {
+            Section {
                 if permissionStatuses.isEmpty {
                     HStack(spacing: 12) {
                         ProgressView()
                             .scaleEffect(0.8, anchor: .center)
                         Text("Checking permissions...")
                             .font(.system(size: 13))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(secondaryTextColor)
                     }
                     .padding(.vertical, 8)
                 } else {
@@ -47,7 +81,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Required")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(secondaryTextColor)
                                 .padding(.bottom, 4)
                             
                             VStack(spacing: 10) {
@@ -60,6 +94,7 @@ struct SettingsView: View {
 
                                         Text(status.displayName)
                                             .font(.system(size: 13))
+                                            .foregroundStyle(primaryTextColor)
 
                                         Spacer()
 
@@ -82,7 +117,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Detected & Optional")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(secondaryTextColor)
                                 .padding(.top, 8)
                                 .padding(.bottom, 4)
                             
@@ -96,6 +131,7 @@ struct SettingsView: View {
 
                                         Text(status.displayName)
                                             .font(.system(size: 13))
+                                            .foregroundStyle(primaryTextColor)
 
                                         Spacer()
 
@@ -118,6 +154,7 @@ struct SettingsView: View {
                             Text("Refresh Status")
                         }
                         .frame(maxWidth: .infinity)
+                        .foregroundStyle(primaryTextColor)
                     }
                     .buttonStyle(.bordered)
                     .padding(.top, 12)
@@ -125,15 +162,27 @@ struct SettingsView: View {
 
                 Text("Click a toggle to open System Settings and grant permission. Only installed apps are shown.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryTextColor)
+            } header: {
+                Text("Automation Permissions")
+                    .foregroundStyle(primaryTextColor)
             }
         }
         .padding(16)
         .frame(width: 420)
+        .scrollContentBackground(.hidden)
+        .background(settingsBackgroundColor)
         .onAppear {
+            systemAppearanceObserver.refresh()
             loadPermissions()
         }
+        .onChange(of: themeModeRawValue) {
+            if themeMode == .system {
+                systemAppearanceObserver.refresh()
+            }
+        }
         .id(refreshKey)
+        .environment(\.colorScheme, effectiveColorScheme)
     }
 
     private func loadPermissions() {

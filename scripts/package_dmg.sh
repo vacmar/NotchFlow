@@ -10,6 +10,7 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 DMG_PATH="$DIST_DIR/$APP_NAME.dmg"
 BIN_PATH="$BUILD_DIR/$APP_NAME"
+RW_DMG_PATH="$DIST_DIR/$APP_NAME-rw.dmg"
 
 echo "Building release binary..."
 cd "$ROOT_DIR"
@@ -63,7 +64,60 @@ codesign --force --deep --sign - "$APP_DIR"
 echo "Creating DMG..."
 mkdir -p "$DIST_DIR"
 rm -f "$DMG_PATH"
-hdiutil create -volname "$APP_NAME" -srcfolder "$APP_DIR" -ov -format UDZO "$DMG_PATH"
+rm -f "$RW_DMG_PATH"
+
+# Cleanup any previously mounted installer volumes for this app name.
+for existing in /Volumes/$APP_NAME(N) /Volumes/$APP_NAME\ *(N); do
+  hdiutil detach "$existing" -quiet 2>/dev/null || true
+done
+
+hdiutil create -size 300m -fs HFS+ -volname "$APP_NAME" -ov "$RW_DMG_PATH"
+
+ATTACH_OUTPUT=$(hdiutil attach "$RW_DMG_PATH" -readwrite -noverify -noautoopen)
+DEVICE=$(echo "$ATTACH_OUTPUT" | awk '/Apple_HFS/ {print $1}' | tail -n1)
+MOUNT_POINT=$(echo "$ATTACH_OUTPUT" | awk '/Apple_HFS/ {$1=""; $2=""; sub(/^  */, ""); print}' | tail -n1)
+
+if [[ -z "${DEVICE:-}" || -z "${MOUNT_POINT:-}" ]]; then
+  echo "Error: failed to attach staging DMG"
+  exit 1
+fi
+
+rm -rf "$MOUNT_POINT/$APP_NAME.app"
+cp -R "$APP_DIR" "$MOUNT_POINT/$APP_NAME.app"
+ln -s /Applications "$MOUNT_POINT/Applications"
+
+echo "Configuring DMG drag-install layout..."
+if ! osascript <<EOF
+tell application "Finder"
+  tell disk "$APP_NAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set bounds of container window to {120, 120, 840, 520}
+
+    set viewOptions to the icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 128
+    set text size of viewOptions to 14
+
+    set position of item "$APP_NAME.app" of container window to {220, 240}
+    set position of item "Applications" of container window to {560, 240}
+
+    close
+    open
+    update without registering applications
+    delay 1
+  end tell
+end tell
+EOF
+then
+  echo "Warning: Finder layout customization failed; DMG will still work for drag-and-drop install."
+fi
+
+hdiutil detach "$DEVICE" -quiet
+hdiutil convert "$RW_DMG_PATH" -format UDZO -o "$DMG_PATH" -quiet
+rm -f "$RW_DMG_PATH"
 
 echo "Done."
 echo "App: $APP_DIR"
