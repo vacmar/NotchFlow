@@ -5,12 +5,65 @@ struct IslandContainerView: View {
     @ObservedObject var viewModel: IslandViewModel
     @Environment(\.openSettings) private var openSettings
     @AppStorage("themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
+    @AppStorage("glassThemeStyle") private var glassThemeStyleRawValue = GlassThemeStyle.frosted.rawValue
+    @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
     @State private var isExpandedContentHovering = false
     @State private var collapseWorkItem: DispatchWorkItem?
 
     private var themeMode: ThemeMode {
         ThemeMode.from(themeModeRawValue)
+    }
+
+    private var glassThemeStyle: GlassThemeStyle {
+        GlassThemeStyle.from(glassThemeStyleRawValue)
+    }
+
+    private var waveformStyle: WaveformStyle {
+        WaveformStyle.from(waveformStyleRawValue)
+    }
+
+    private var islandBaseFillStyle: AnyShapeStyle {
+        if glassThemeStyle == .clear {
+            if effectiveColorScheme == .dark {
+                return AnyShapeStyle(Color.white.opacity(0.025))
+            }
+            return AnyShapeStyle(Color.white.opacity(0.12))
+        }
+
+        return AnyShapeStyle(.ultraThinMaterial)
+    }
+
+    private var islandTintColor: Color {
+        if glassThemeStyle == .clear {
+            return effectiveColorScheme == .dark ? Color.white.opacity(0.035) : Color.white.opacity(0.08)
+        }
+
+        return IslandGlassTheme.tintColor(for: effectiveColorScheme)
+    }
+
+    private var islandBorderColor: Color {
+        if glassThemeStyle == .clear {
+            return effectiveColorScheme == .dark ? Color.white.opacity(0.26) : Color.black.opacity(0.16)
+        }
+
+        return IslandGlassTheme.borderColor(for: effectiveColorScheme)
+    }
+
+    private var islandGlowColor: Color {
+        if glassThemeStyle == .clear {
+            return effectiveColorScheme == .dark ? Color.white.opacity(0.035) : Color.white.opacity(0.1)
+        }
+
+        return IslandGlassTheme.glowColor(for: effectiveColorScheme)
+    }
+
+    private var islandShadowColor: Color {
+        if glassThemeStyle == .clear {
+            return IslandGlassTheme.shadowColor(for: effectiveColorScheme).opacity(0.35)
+        }
+
+        return IslandGlassTheme.shadowColor(for: effectiveColorScheme)
     }
 
     private var effectiveColorScheme: ColorScheme {
@@ -36,18 +89,20 @@ struct IslandContainerView: View {
 
         ZStack {
             islandShape
-                .fill(.ultraThinMaterial)
-                .overlay(islandShape.fill(IslandGlassTheme.tintColor(for: effectiveColorScheme)))
+                .fill(islandBaseFillStyle)
+                .overlay(
+                    islandShape.fill(islandTintColor)
+                )
                 .overlay(
                     islandShape
-                        .stroke(IslandGlassTheme.borderColor(for: effectiveColorScheme), lineWidth: 1)
+                        .stroke(islandBorderColor, lineWidth: 1)
                 )
                 .background(
                     islandShape
-                        .fill(IslandGlassTheme.glowColor(for: effectiveColorScheme))
+                        .fill(islandGlowColor)
                         .blur(radius: 14)
                 )
-                .shadow(color: IslandGlassTheme.shadowColor(for: effectiveColorScheme), radius: 24, y: 6)
+                .shadow(color: islandShadowColor, radius: 24, y: 6)
                 .allowsHitTesting(viewModel.isExpanded)
 
             if viewModel.isExpanded {
@@ -88,9 +143,15 @@ struct IslandContainerView: View {
         let controlsColumnWidth: CGFloat = 136
 
         return HStack(alignment: .center, spacing: 12) {
-            artwork
-                .frame(width: 68, alignment: .center)
-                .offset(x: albumShiftX, y: albumShiftY)
+            Button {
+                viewModel.openCurrentSourceApp()
+            } label: {
+                artwork
+            }
+            .buttonStyle(.plain)
+            .help("Open source app")
+            .frame(width: 68, alignment: .center)
+            .offset(x: albumShiftX, y: albumShiftY)
 
             VStack(alignment: .leading, spacing: 5) {
                 ScrollingLineText(
@@ -127,7 +188,11 @@ struct IslandContainerView: View {
 
             VStack(alignment: .trailing, spacing: 5) {
                 HStack(spacing: 8) {
-                    WaveformView(isPlaying: viewModel.snapshot.isPlaying, colorScheme: effectiveColorScheme)
+                    WaveformView(
+                        isPlaying: viewModel.snapshot.isPlaying,
+                        colorScheme: effectiveColorScheme,
+                        style: waveformStyle
+                    )
                     Button {
                         openSettings()
                         centerSettingsWindow()

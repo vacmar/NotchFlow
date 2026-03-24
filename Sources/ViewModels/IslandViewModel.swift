@@ -75,6 +75,10 @@ final class IslandViewModel: ObservableObject {
         }
     }
 
+    func openCurrentSourceApp() {
+        nowPlayingService.openSourceApp(source: snapshot.source)
+    }
+
     private func startPolling() {
         pollingTask = Task { [weak self] in
             guard let self else { return }

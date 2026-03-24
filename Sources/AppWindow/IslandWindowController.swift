@@ -8,6 +8,7 @@ final class IslandWindowController: NSWindowController {
     private var expansionStateCancellable: AnyCancellable?
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
+    private var trackpadSwipeAccumulatedX: CGFloat = 0
 
     init<Content: View>(rootView: Content, viewModel: IslandViewModel) {
         self.viewModel = viewModel
@@ -83,10 +84,56 @@ final class IslandWindowController: NSWindowController {
         }
 
         localMouseMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.mouseMoved, .leftMouseDragged]
+            matching: [.mouseMoved, .leftMouseDragged, .scrollWheel]
         ) { [weak self] event in
-            self?.updateHoverFromMouseLocation()
+            if event.type == .scrollWheel {
+                self?.handleTrackpadScrollSwipe(event)
+            } else {
+                self?.updateHoverFromMouseLocation()
+            }
             return event
+        }
+    }
+
+    private func handleTrackpadScrollSwipe(_ event: NSEvent) {
+        guard viewModel.isExpanded,
+              let window,
+              window.frame.contains(NSEvent.mouseLocation)
+        else {
+            trackpadSwipeAccumulatedX = 0
+            return
+        }
+
+        if event.phase == .began {
+            trackpadSwipeAccumulatedX = 0
+        }
+
+        let horizontal = event.scrollingDeltaX
+        let vertical = event.scrollingDeltaY
+        guard abs(horizontal) > abs(vertical) else {
+            if event.phase == .ended || event.phase == .cancelled {
+                trackpadSwipeAccumulatedX = 0
+            }
+            return
+        }
+
+        trackpadSwipeAccumulatedX += horizontal
+        let threshold: CGFloat = 55
+
+        if trackpadSwipeAccumulatedX <= -threshold {
+            trackpadSwipeAccumulatedX = 0
+            Task { @MainActor in
+                self.viewModel.next()
+            }
+        } else if trackpadSwipeAccumulatedX >= threshold {
+            trackpadSwipeAccumulatedX = 0
+            Task { @MainActor in
+                self.viewModel.previous()
+            }
+        }
+
+        if event.phase == .ended || event.phase == .cancelled {
+            trackpadSwipeAccumulatedX = 0
         }
     }
 

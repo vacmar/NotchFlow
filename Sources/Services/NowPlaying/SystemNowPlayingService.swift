@@ -163,6 +163,66 @@ struct SystemNowPlayingService {
         }
     }
 
+    func openSourceApp(source: NowPlayingSource) {
+        switch source {
+        case .spotify:
+            runScript("""
+            tell application "Spotify"
+                activate
+            end tell
+            """)
+        case .music:
+            runScript("""
+            tell application "Music"
+                activate
+            end tell
+            """)
+        case .browser:
+            let browsers = ["Google Chrome", "Safari", "Brave Browser", "Opera", "Opera GX"]
+            for browser in browsers {
+                let script = """
+                tell application "\(browser)"
+                    if running then
+                        activate
+                        return "ok"
+                    end if
+                end tell
+                """
+                if executeScriptString(script) == "ok" {
+                    break
+                }
+            }
+        case .system:
+            if executeScriptString("""
+            tell application "Spotify"
+                if running then
+                    activate
+                    return "ok"
+                end if
+            end tell
+            """) == "ok" {
+                return
+            }
+            if executeScriptString("""
+            tell application "Music"
+                if running then
+                    activate
+                    return "ok"
+                end if
+            end tell
+            """) == "ok" {
+                return
+            }
+            _ = executeScriptString("""
+            tell application "Safari"
+                if running then activate
+            end tell
+            """)
+        case .none:
+            break
+        }
+    }
+
     private func artworkImage(from info: [String: Any], fallback: NSImage?) -> NSImage? {
         guard let mediaArtwork = info[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork else {
             return fallback

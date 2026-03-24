@@ -11,6 +11,7 @@ APP_DIR="$DIST_DIR/$APP_NAME.app"
 DMG_PATH="$DIST_DIR/$APP_NAME.dmg"
 BIN_PATH="$BUILD_DIR/$APP_NAME"
 RW_DMG_PATH="$DIST_DIR/$APP_NAME-rw.dmg"
+ICON_PATH="$ROOT_DIR/Assets/AppIcon.icns"
 
 echo "Building release binary..."
 cd "$ROOT_DIR"
@@ -28,6 +29,10 @@ mkdir -p "$APP_DIR/Contents/Resources"
 
 cp "$BIN_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
+
+if [[ -f "$ICON_PATH" ]]; then
+  cp "$ICON_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
+fi
 
 cat > "$APP_DIR/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -48,6 +53,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
   <string>$VERSION</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
