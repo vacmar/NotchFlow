@@ -77,6 +77,30 @@ Output artifacts:
 
 The DMG is built with drag-to-Applications layout (includes an Applications shortcut and icon positioning).
 
+## Release process
+
+Create a versioned release bundle:
+
+```bash
+chmod +x scripts/release.sh
+./scripts/release.sh 0.1.0
+```
+
+This generates:
+
+- release/v0.1.0/NotchFlow-v0.1.0.app
+- release/v0.1.0/NotchFlow-v0.1.0.dmg
+- release/v0.1.0/NotchFlow-v0.1.0.dmg.sha256
+- release/v0.1.0/RELEASE_NOTES.md
+
+Then publish on GitHub Releases:
+
+1. Push tag `v0.1.0`
+2. Open the repository Releases page
+3. Draft new release from tag `v0.1.0`
+4. Upload the DMG and SHA-256 files
+5. Paste release notes from `release/v0.1.0/RELEASE_NOTES.md`
+
 ## Project structure
 
 - Sources/DynamicIslandApp.swift: app lifecycle, menu/status controls

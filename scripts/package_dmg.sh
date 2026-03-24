@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_NAME="NotchFlow"
 BUNDLE_ID="com.notchflow.app"
-VERSION="1.0.0"
+VERSION="${VERSION:-0.1.0}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build/release"
 DIST_DIR="$ROOT_DIR/dist"

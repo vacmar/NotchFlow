@@ -3,6 +3,7 @@
 .swiftpm/
 Package.resolved
 dist/
+release/
 
 # Xcode
 DerivedData/
