@@ -10,16 +10,16 @@ final class SystemAppearanceObserver: NSObject, ObservableObject {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleAppDidBecomeActive),
+            selector: #selector(handleAppDidBecomeActive(_:)),
             name: NSApplication.didBecomeActiveNotification,
-            object: NSApp,
+            object: NSApp
         )
 
         DistributedNotificationCenter.default().addObserver(
             self,
-            selector: #selector(handleAppearanceChanged),
+            selector: #selector(handleAppearanceChanged(_:)),
             name: Notification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil,
+            object: nil
         )
     }
 
@@ -42,12 +42,12 @@ final class SystemAppearanceObserver: NSObject, ObservableObject {
     }
 
     @objc
-    private func handleAppDidBecomeActive() {
+    private func handleAppDidBecomeActive(_ notification: Notification) {
         refresh()
     }
 
     @objc
-    private func handleAppearanceChanged() {
+    private func handleAppearanceChanged(_ notification: Notification) {
         refresh()
     }
 }
