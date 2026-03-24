@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showPermissionsSetup(viewModel: IslandViewModel) {
         let setupView = PermissionsSetupView(viewModel: viewModel)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 550),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 620),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

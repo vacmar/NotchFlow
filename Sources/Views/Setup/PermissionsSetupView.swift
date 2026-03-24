@@ -54,19 +54,23 @@ struct PermissionsSetupView: View {
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
+                .padding(.top, 8)
                 .frame(maxWidth: .infinity)
 
-                if currentStep == 0 {
-                    setupStep0
-                } else if currentStep == 1 {
-                    setupStep1
-                } else if currentStep == 2 {
-                    setupStep2
-                } else {
-                    setupStep3
+                ScrollView(.vertical, showsIndicators: true) {
+                    Group {
+                        if currentStep == 0 {
+                            setupStep0
+                        } else if currentStep == 1 {
+                            setupStep1
+                        } else if currentStep == 2 {
+                            setupStep2
+                        } else {
+                            setupStep3
+                        }
+                    }
                 }
-
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 // Navigation buttons
                 HStack(spacing: 12) {
@@ -97,7 +101,7 @@ struct PermissionsSetupView: View {
             }
             .padding(32)
         }
-        .frame(minWidth: 500, minHeight: 550)
+        .frame(minWidth: 500, minHeight: 620)
         .onAppear {
             currentStep = 0
             detectInstalledBrowsers()

@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## v1.0.3 - 2026-03-24
+
+### Fixed
+- Setup flow now keeps action buttons visible by making setup-step content scrollable.
+- Setup window minimum height increased to avoid clipped header content on first launch.
+- Onboarding usability improved for end-to-end permission testing runs.
+
 ## v0.1.0 - 2026-03-24
 
 ### Added
