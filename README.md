@@ -1,10 +1,10 @@
 # NotchFlow
 
-NotchFlow is a macOS menu-bar style Dynamic Island experience for live media playback. It stays near the notch area, expands on hover, shows now-playing metadata, and gives quick transport controls.
+NotchFlow is a macOS menu-bar style floating island experience for live media playback. It stays near the notch area, expands on hover, shows now-playing metadata, and gives quick transport controls.
 
 ## Highlights
 
-- Dynamic Island style UI with collapsed and expanded states
+- NotchFlow style UI with collapsed and expanded states
 - Live now-playing support for:
 	- Spotify
 	- Apple Music
@@ -175,7 +175,7 @@ Then publish on GitHub Releases:
 
 ## Project structure
 
-- Sources/DynamicIslandApp.swift: app lifecycle, menu/status controls
+- Sources main app entry: app lifecycle, menu/status controls
 - Sources/AppWindow: notch window controller + positioning
 - Sources/ViewModels: island state, polling, commands
 - Sources/Services/NowPlaying: media detection and control

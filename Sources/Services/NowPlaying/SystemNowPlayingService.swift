@@ -14,7 +14,7 @@ struct SystemNowPlayingService {
             return spotify
         }
         // Check Apple Music if playing
-        if let music = musicSnapshot(previous: previous), music.isPlaying {
+        if let music = await musicSnapshot(previous: previous), music.isPlaying {
             return music
         }
         // Check browsers next (separate from system center to avoid stale paused app snapshots)
@@ -28,7 +28,7 @@ struct SystemNowPlayingService {
             if let spotify = await spotifySnapshot(previous: previous) {
                 return spotify
             }
-            if let music = musicSnapshot(previous: previous) {
+            if let music = await musicSnapshot(previous: previous) {
                 return music
             }
             return NowPlayingSnapshot.placeholder
@@ -78,7 +78,7 @@ struct SystemNowPlayingService {
         case "Spotify":
             return await spotifySnapshot(previous: previous)
         case "Music":
-            return musicSnapshot(previous: previous)
+            return await musicSnapshot(previous: previous)
         case "Safari", "Google Chrome", "Brave Browser", "Opera", "Opera GX":
             return await browserSnapshot(previous: previous, preferredBrowserName: frontmost)
         default:
@@ -224,12 +224,36 @@ struct SystemNowPlayingService {
     }
 
     private func artworkImage(from info: [String: Any], fallback: NSImage?) -> NSImage? {
-        guard let mediaArtwork = info[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork else {
-            return fallback
+        if let mediaArtwork = info[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork {
+            let requestedSize = NSSize(width: 128, height: 128)
+            if let image = mediaArtwork.image(at: requestedSize) {
+                return image
+            }
         }
 
-        let requestedSize = NSSize(width: 128, height: 128)
-        return mediaArtwork.image(at: requestedSize) ?? fallback
+        if let directImage = info[MPMediaItemPropertyArtwork] as? NSImage {
+            return directImage
+        }
+
+        let explicitArtworkDataKeys = [
+            "kMRMediaRemoteNowPlayingInfoArtworkData",
+            "kMRMediaRemoteNowPlayingInfoArtworkDataHD",
+            "ArtworkData"
+        ]
+
+        for key in explicitArtworkDataKeys {
+            if let data = info[key] as? Data, let image = NSImage(data: data) {
+                return image
+            }
+        }
+
+        for value in info.values {
+            if let data = value as? Data, let image = NSImage(data: data) {
+                return image
+            }
+        }
+
+        return fallback
     }
 
     private func runScript(_ source: String) {
@@ -291,7 +315,7 @@ struct SystemNowPlayingService {
         )
     }
 
-    private func musicSnapshot(previous: NowPlayingSnapshot) -> NowPlayingSnapshot? {
+    private func musicSnapshot(previous: NowPlayingSnapshot) async -> NowPlayingSnapshot? {
         let script = """
         tell application "Music"
             if not running then
@@ -328,17 +352,71 @@ struct SystemNowPlayingService {
         let state = parts[4].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
         let progress = durationSec > 0 ? min(max(elapsedSec / durationSec, 0), 1) : previous.progress
+        let systemArtwork = MPNowPlayingInfoCenter.default().nowPlayingInfo.flatMap { artworkImage(from: $0, fallback: nil) }
+        let fallbackArtwork = systemArtwork ?? previous.artwork
+        let artwork = await musicArtwork(trackName: title, artistName: artist, fallback: fallbackArtwork)
 
         return NowPlayingSnapshot(
             title: title.isEmpty ? "Music" : title,
             artist: artist.isEmpty ? "Apple Music" : artist,
-            artwork: previous.artwork,
+            artwork: artwork,
             isPlaying: state.contains("playing"),
             progress: progress,
             elapsedSeconds: elapsedSec,
             durationSeconds: durationSec,
             source: .music
         )
+    }
+
+    private func musicArtwork(trackName: String, artistName: String, fallback: NSImage?) async -> NSImage? {
+        let trimmedTrack = trackName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedArtist = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTrack.isEmpty || !trimmedArtist.isEmpty else {
+            return fallback
+        }
+
+        let cacheKey = "\(trimmedTrack.lowercased())|\(trimmedArtist.lowercased())"
+        if let cached = await MusicArtworkCache.shared.image(for: cacheKey) {
+            return cached
+        }
+
+        guard await MusicArtworkCache.shared.beginLoadingIfNeeded(key: cacheKey) else {
+            return fallback
+        }
+
+        let query = [trimmedTrack, trimmedArtist].filter { !$0.isEmpty }.joined(separator: " ")
+
+        Task.detached(priority: .utility) {
+            defer {
+                Task { await MusicArtworkCache.shared.finishLoading(key: cacheKey) }
+            }
+
+            guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "https://itunes.apple.com/search?term=\(encodedQuery)&entity=song&limit=1"),
+                  let (data, _) = try? await URLSession.shared.data(from: url),
+                  let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = jsonObject["results"] as? [[String: Any]],
+                  let first = results.first,
+                  let artworkURLString = (first["artworkUrl100"] as? String) ?? (first["artworkUrl60"] as? String)
+            else {
+                return
+            }
+
+            let highResArtworkURLString = artworkURLString
+                .replacingOccurrences(of: "100x100bb", with: "512x512bb")
+                .replacingOccurrences(of: "60x60bb", with: "512x512bb")
+
+            guard let artworkURL = URL(string: highResArtworkURLString),
+                  let (artworkData, _) = try? await URLSession.shared.data(from: artworkURL),
+                  let artworkImage = NSImage(data: artworkData)
+            else {
+                return
+            }
+
+            await MusicArtworkCache.shared.setImage(artworkImage, for: cacheKey)
+        }
+
+        return fallback
     }
 
     private func browserSnapshot(previous: NowPlayingSnapshot, preferredBrowserName: String? = nil) async -> NowPlayingSnapshot? {
@@ -860,6 +938,34 @@ private actor YouTubeDurationCache {
 
     func setDuration(_ duration: TimeInterval, for key: String) {
         durations[key] = duration
+    }
+
+    func beginLoadingIfNeeded(key: String) -> Bool {
+        if loadingKeys.contains(key) {
+            return false
+        }
+
+        loadingKeys.insert(key)
+        return true
+    }
+
+    func finishLoading(key: String) {
+        loadingKeys.remove(key)
+    }
+}
+
+private actor MusicArtworkCache {
+    static let shared = MusicArtworkCache()
+
+    private var images: [String: NSImage] = [:]
+    private var loadingKeys: Set<String> = []
+
+    func image(for key: String) -> NSImage? {
+        images[key]
+    }
+
+    func setImage(_ image: NSImage, for key: String) {
+        images[key] = image
     }
 
     func beginLoadingIfNeeded(key: String) -> Bool {

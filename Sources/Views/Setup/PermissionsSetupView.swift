@@ -340,7 +340,7 @@ struct PermissionsSetupView: View {
                             .foregroundColor(.white)
                             .cornerRadius(4)
 
-                        Text("Enable Dynamic Island for each browser")
+                        Text("Enable NotchFlow for each browser")
                             .font(.system(size: 13))
                     }
                 }
@@ -349,7 +349,7 @@ struct PermissionsSetupView: View {
                 .cornerRadius(6)
             }
 
-            Text("After granting permissions, Dynamic Island will automatically detect what's playing in each app.")
+            Text("After granting permissions, NotchFlow will automatically detect what's playing in each app.")
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .lineLimit(nil)

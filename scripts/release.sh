@@ -36,7 +36,7 @@ cat > "$RELEASE_DIR/RELEASE_NOTES.md" <<EOF
 # NotchFlow $TAG
 
 ## Highlights
-- Dynamic Island style now-playing UI for macOS
+- NotchFlow style now-playing UI for macOS
 - Spotify / Apple Music / browser media detection and controls
 - Theme-aware island + settings (System, Dark, Light)
 - Permissions setup + status panel

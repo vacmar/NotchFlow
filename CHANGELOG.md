@@ -12,7 +12,7 @@ All notable changes to this project are documented in this file.
 ## v0.1.0 - 2026-03-24
 
 ### Added
-- Initial NotchFlow release with Dynamic Island style floating UI.
+- Initial NotchFlow release with NotchFlow style floating UI.
 - Live now-playing metadata and controls for Spotify, Apple Music, and supported browsers.
 - Permissions setup flow and in-settings permissions status page.
 - Theme modes (System, Dark, Light) with themed settings and island surfaces.
