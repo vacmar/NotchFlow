@@ -12,6 +12,10 @@ DMG_PATH="$DIST_DIR/$APP_NAME.dmg"
 BIN_PATH="$BUILD_DIR/$APP_NAME"
 RW_DMG_PATH="$DIST_DIR/$APP_NAME-rw.dmg"
 ICON_PATH="$ROOT_DIR/Assets/AppIcon.icns"
+DMG_BACKGROUND_SOURCE_PATH="$ROOT_DIR/Assets/InstallerBackground.png"
+DMG_BACKGROUND_NAME="InstallerBackground.png"
+DMG_WINDOW_WIDTH=1120
+DMG_WINDOW_HEIGHT=720
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-$ROOT_DIR/scripts/NotchFlow.entitlements}"
 
@@ -102,7 +106,13 @@ fi
 
 rm -rf "$MOUNT_POINT/$APP_NAME.app"
 cp -R "$APP_DIR" "$MOUNT_POINT/$APP_NAME.app"
+rm -f "$MOUNT_POINT/Applications"
 ln -s /Applications "$MOUNT_POINT/Applications"
+
+if [[ -f "$DMG_BACKGROUND_SOURCE_PATH" ]]; then
+  mkdir -p "$MOUNT_POINT/.background"
+  sips -z "$DMG_WINDOW_HEIGHT" "$DMG_WINDOW_WIDTH" "$DMG_BACKGROUND_SOURCE_PATH" --out "$MOUNT_POINT/.background/$DMG_BACKGROUND_NAME" >/dev/null
+fi
 
 echo "Configuring DMG drag-install layout..."
 if ! osascript <<EOF
@@ -112,15 +122,21 @@ tell application "Finder"
     set current view of container window to icon view
     set toolbar visible of container window to false
     set statusbar visible of container window to false
-    set bounds of container window to {120, 120, 840, 520}
+    set bounds of container window to {120, 120, 1240, 840}
 
     set viewOptions to the icon view options of container window
     set arrangement of viewOptions to not arranged
-    set icon size of viewOptions to 128
+    set icon size of viewOptions to 190
     set text size of viewOptions to 14
+    set label position of viewOptions to bottom
+    if exists file ".background:$DMG_BACKGROUND_NAME" of container window then
+      set background picture of viewOptions to file ".background:$DMG_BACKGROUND_NAME"
+    else
+      set background color of viewOptions to {61000, 61000, 61000}
+    end if
 
-    set position of item "$APP_NAME.app" of container window to {220, 240}
-    set position of item "Applications" of container window to {560, 240}
+    set position of item "$APP_NAME.app" of container window to {300, 360}
+    set position of item "Applications" of container window to {790, 360}
 
     close
     open

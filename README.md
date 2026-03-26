@@ -83,6 +83,32 @@ Output artifacts:
 - dist/NotchFlow.dmg
 
 The DMG is built with drag-to-Applications layout (includes an Applications shortcut and icon positioning).
+If `Assets/InstallerBackground.png` exists, it is used as the installer window background.
+If it is missing, the DMG uses a clean solid background color.
+
+## Install from terminal (release DMG)
+
+Download and install a specific version without opening Finder:
+
+```bash
+VERSION="1.0.3"
+curl -L -o "$HOME/Downloads/NotchFlow-v${VERSION}.dmg" \
+	"https://github.com/vaaheesan/NotchFlow/releases/download/v${VERSION}/NotchFlow-v${VERSION}.dmg"
+hdiutil attach "$HOME/Downloads/NotchFlow-v${VERSION}.dmg"
+sudo ditto "/Volumes/NotchFlow/NotchFlow.app" "/Applications/NotchFlow.app"
+hdiutil detach "/Volumes/NotchFlow"
+```
+
+If macOS quarantine blocks launch, run:
+
+```bash
+xattr -dr com.apple.quarantine "$HOME/Downloads/NotchFlow-v${VERSION}.dmg"
+hdiutil attach "$HOME/Downloads/NotchFlow-v${VERSION}.dmg"
+xattr -dr com.apple.quarantine "/Volumes/NotchFlow/NotchFlow.app"
+sudo ditto "/Volumes/NotchFlow/NotchFlow.app" "/Applications/NotchFlow.app"
+xattr -dr com.apple.quarantine "/Applications/NotchFlow.app"
+hdiutil detach "/Volumes/NotchFlow"
+```
 
 ## Notarization (works with private repos)
 

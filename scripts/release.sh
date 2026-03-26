@@ -48,6 +48,27 @@ cat > "$RELEASE_DIR/RELEASE_NOTES.md" <<EOF
 3. Drag NotchFlow to Applications
 4. Launch NotchFlow from Applications
 
+### Terminal install (optional)
+
+Install directly from a downloaded DMG:
+
+~~~bash
+hdiutil attach "\$HOME/Downloads/NotchFlow-$TAG.dmg"
+sudo ditto "/Volumes/NotchFlow/NotchFlow.app" "/Applications/NotchFlow.app"
+hdiutil detach "/Volumes/NotchFlow"
+~~~
+
+If macOS quarantine blocks launch:
+
+~~~bash
+xattr -dr com.apple.quarantine "\$HOME/Downloads/NotchFlow-$TAG.dmg"
+hdiutil attach "\$HOME/Downloads/NotchFlow-$TAG.dmg"
+xattr -dr com.apple.quarantine "/Volumes/NotchFlow/NotchFlow.app"
+sudo ditto "/Volumes/NotchFlow/NotchFlow.app" "/Applications/NotchFlow.app"
+xattr -dr com.apple.quarantine "/Applications/NotchFlow.app"
+hdiutil detach "/Volumes/NotchFlow"
+~~~
+
 ## Integrity
 - SHA-256: see NotchFlow-$TAG.dmg.sha256
 EOF
