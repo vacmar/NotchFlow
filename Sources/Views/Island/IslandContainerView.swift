@@ -6,6 +6,7 @@ struct IslandContainerView: View {
     @AppStorage("themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("glassThemeStyle") private var glassThemeStyleRawValue = GlassThemeStyle.frosted.rawValue
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
+    @AppStorage("timelineStyle") private var timelineStyleRawValue = TimelineStyle.solid.rawValue
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
     @State private var isExpandedContentHovering = false
     @State private var collapseWorkItem: DispatchWorkItem?
@@ -20,6 +21,10 @@ struct IslandContainerView: View {
 
     private var waveformStyle: WaveformStyle {
         WaveformStyle.from(waveformStyleRawValue)
+    }
+
+    private var timelineStyle: TimelineStyle {
+        TimelineStyle.from(timelineStyleRawValue)
     }
 
     private var islandBaseFillStyle: AnyShapeStyle {
@@ -169,7 +174,10 @@ struct IslandContainerView: View {
                 )
                 .help(viewModel.snapshot.artist)
 
-                ProgressStripView(progress: viewModel.snapshot.progress)
+                ProgressStripView(
+                    progress: viewModel.snapshot.progress,
+                    timelineStyle: timelineStyle
+                )
 
                 HStack(spacing: 6) {
                     Text(formattedElapsed)

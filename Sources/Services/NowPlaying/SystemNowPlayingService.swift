@@ -528,7 +528,12 @@ struct SystemNowPlayingService {
                 ? clampedDuration
                 : (systemDuration > 0 ? systemDuration : (youtubeDuration ?? 0))
 
-            let sameBrowserTrack = previous.source == .browser && previous.title == parsed.title
+            let sameBrowserTrack = isSameBrowserTrack(
+                previous: previous,
+                currentTitle: parsed.title,
+                currentArtist: parsed.artist ?? sourceName,
+                currentDuration: resolvedDuration
+            )
             let playingFallback = playbackState
                 ?? timing?.isPlaying
                 ?? (systemPlaybackRate > 0 ? true : (sameBrowserTrack ? previous.isPlaying : false))
@@ -798,6 +803,61 @@ struct SystemNowPlayingService {
             }
         }
         return (title: pageTitle.isEmpty ? "Playing in Browser" : pageTitle, artist: nil)
+    }
+
+    private func isSameBrowserTrack(previous: NowPlayingSnapshot, currentTitle: String, currentArtist: String, currentDuration: TimeInterval) -> Bool {
+        guard previous.source == .browser else {
+            return false
+        }
+
+        let previousKey = normalizedBrowserTrackKey(title: previous.title, artist: previous.artist)
+        let currentKey = normalizedBrowserTrackKey(title: currentTitle, artist: currentArtist)
+        guard !previousKey.isEmpty, !currentKey.isEmpty else {
+            return false
+        }
+
+        let durationLooksSame: Bool
+        if previous.durationSeconds > 0, currentDuration > 0 {
+            durationLooksSame = abs(previous.durationSeconds - currentDuration) <= 2.0
+        } else {
+            durationLooksSame = true
+        }
+
+        if previousKey == currentKey {
+            return durationLooksSame
+        }
+
+        let fuzzyMatch = previousKey.contains(currentKey) || currentKey.contains(previousKey)
+        return fuzzyMatch && durationLooksSame
+    }
+
+    private func normalizedBrowserTrackKey(title: String, artist: String) -> String {
+        let raw = "\(title) \(artist)".lowercased()
+        let patterns = [
+            #"\b\d{1,2}:\d{2}(?::\d{2})?\b"#,   // 1:23 or 01:23:45
+            #"\b\d+\s*/\s*\d+\b"#,             // 12/200 counters
+            #"\[[^\]]*\]"#,                      // [1], [live], etc.
+            #"\([^\)]*\)"#                       // (1), (Official), etc.
+        ]
+
+        let cleaned = patterns.reduce(raw) { partial, pattern in
+            guard let regex = try? NSRegularExpression(pattern: pattern) else {
+                return partial
+            }
+            let range = NSRange(partial.startIndex..., in: partial)
+            return regex.stringByReplacingMatches(in: partial, range: range, withTemplate: " ")
+        }
+
+        let allowed = cleaned.map { char -> Character in
+            if char.isLetter || char.isNumber || char.isWhitespace {
+                return char
+            }
+            return " "
+        }
+
+        return String(allowed)
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
     }
 
     private func spotifyArtwork(from artworkURLString: String, fallback: NSImage?) async -> NSImage? {
