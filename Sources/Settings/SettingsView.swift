@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     private enum SettingsPanel: String, CaseIterable, Identifiable {
         case appearance
+        case islandBehavior
+        case islandTheming
         case gestures
         case automationPermissions
 
@@ -12,6 +14,10 @@ struct SettingsView: View {
             switch self {
             case .appearance:
                 return "Appearance"
+            case .islandBehavior:
+                return "Island Behavior"
+            case .islandTheming:
+                return "Island Theming"
             case .gestures:
                 return "Gestures"
             case .automationPermissions:
@@ -23,6 +29,10 @@ struct SettingsView: View {
             switch self {
             case .appearance:
                 return "paintbrush"
+            case .islandBehavior:
+                return "slider.horizontal.3"
+            case .islandTheming:
+                return "photo.artframe"
             case .gestures:
                 return "hand.draw"
             case .automationPermissions:
@@ -37,7 +47,14 @@ struct SettingsView: View {
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
     @AppStorage("timelineStyle") private var timelineStyleRawValue = TimelineStyle.solid.rawValue
     @AppStorage("islandOpacity") private var islandOpacity = 1.0
+    @AppStorage("islandVisibilityMode") private var islandVisibilityModeRawValue = IslandVisibilityMode.auto.rawValue
+    @AppStorage("smartAutoExpandEnabled") private var smartAutoExpandEnabled = true
+    @AppStorage("focusAwareBehaviorEnabled") private var focusAwareBehaviorEnabled = false
     @AppStorage("dynamicArtworkTheming") private var dynamicArtworkTheming = true
+    @AppStorage("enhancedArtworkThemingEnabled") private var enhancedArtworkThemingEnabled = true
+    @AppStorage("idleDimEnabled") private var idleDimEnabled = true
+    @AppStorage("clickThroughCollapsedEnabled") private var clickThroughCollapsedEnabled = true
+    @AppStorage("autoHideFullscreenEnabled") private var autoHideFullscreenEnabled = true
     @State private var permissionStatuses: [PermissionStatus] = []
     @State private var refreshKey = UUID()
     @State private var lastRefreshedAt = Date()
@@ -90,6 +107,14 @@ struct SettingsView: View {
             TimelineStyle.from(timelineStyleRawValue)
         } set: { newValue in
             timelineStyleRawValue = newValue.rawValue
+        }
+    }
+
+    private var selectedIslandVisibilityMode: Binding<IslandVisibilityMode> {
+        Binding {
+            IslandVisibilityMode.from(islandVisibilityModeRawValue)
+        } set: { newValue in
+            islandVisibilityModeRawValue = newValue.rawValue
         }
     }
 
@@ -155,17 +180,24 @@ struct SettingsView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(primaryTextColor)
 
-                Group {
-                    switch selectedPanel {
-                    case .appearance:
-                        appearancePanel
-                    case .gestures:
-                        gesturesPanel
-                    case .automationPermissions:
-                        permissionsPanel
+                ScrollView(.vertical, showsIndicators: true) {
+                    Group {
+                        switch selectedPanel {
+                        case .appearance:
+                            appearancePanel
+                        case .islandBehavior:
+                            islandBehaviorPanel
+                        case .islandTheming:
+                            islandThemingPanel
+                        case .gestures:
+                            gesturesPanel
+                        case .automationPermissions:
+                            permissionsPanel
+                        }
                     }
+                    .id(refreshKey)
                 }
-                .id(refreshKey)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                 Spacer(minLength: 0)
             }
@@ -363,6 +395,14 @@ struct SettingsView: View {
                     .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
 
+
+            }
+        }
+    }
+
+    private var islandBehaviorPanel: some View {
+        sectionCard {
+            VStack(alignment: .leading, spacing: appearanceRowSpacing) {
                 HStack(alignment: .center, spacing: rowHorizontalSpacing) {
                     Text("Island Opacity")
                         .foregroundStyle(primaryTextColor)
@@ -388,6 +428,128 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Mode")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Picker("", selection: selectedIslandVisibilityMode) {
+                        ForEach(IslandVisibilityMode.allCases) { mode in
+                            Text(mode.title)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .tag(mode)
+                        }
+                    }
+                    .frame(width: segmentedControlWidth, alignment: .leading)
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+
+                Text("Auto follows hover, while Always modes keep the island persistently visible.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Smart Expand")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $smartAutoExpandEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("Temporarily expands on track/source/playback changes.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Focus Aware")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $focusAwareBehaviorEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("Reduces intrusive auto-expansion while you are focused in non-media apps.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Idle Dim")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $idleDimEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("Softly dims the island after inactivity to reduce distraction.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Click Through")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $clickThroughCollapsedEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("When collapsed, pass mouse clicks through the island region.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Hide Fullscreen")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $autoHideFullscreenEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("Automatically hides the island while a fullscreen space is active.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var islandThemingPanel: some View {
+        sectionCard {
+            VStack(alignment: .leading, spacing: appearanceRowSpacing) {
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
                     Text("Artwork Theming")
                         .foregroundStyle(primaryTextColor)
                         .frame(width: labelColumnWidth, alignment: .leading)
@@ -398,6 +560,24 @@ struct SettingsView: View {
                 }
 
                 Text("Extract dominant color from album art for dynamic theming")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Better Theme")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $enhancedArtworkThemingEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("Improves artwork tint, border, glow, and text contrast automatically.")
                     .font(.caption)
                     .foregroundStyle(secondaryTextColor)
                     .padding(.leading, labelColumnWidth + rowHorizontalSpacing)

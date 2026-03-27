@@ -8,10 +8,16 @@ struct IslandContainerView: View {
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
     @AppStorage("timelineStyle") private var timelineStyleRawValue = TimelineStyle.solid.rawValue
     @AppStorage("islandOpacity") private var islandOpacity = 1.0
+    @AppStorage("islandVisibilityMode") private var islandVisibilityModeRawValue = IslandVisibilityMode.auto.rawValue
+    @AppStorage("focusAwareBehaviorEnabled") private var focusAwareBehaviorEnabled = false
     @AppStorage("dynamicArtworkTheming") private var dynamicArtworkTheming = true
+    @AppStorage("enhancedArtworkThemingEnabled") private var enhancedArtworkThemingEnabled = true
+    @AppStorage("idleDimEnabled") private var idleDimEnabled = true
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
     @State private var isExpandedContentHovering = false
     @State private var collapseWorkItem: DispatchWorkItem?
+    @State private var lastInteractionDate = Date()
+    @State private var currentTimestamp = Date()
 
     private var themeMode: ThemeMode {
         ThemeMode.from(themeModeRawValue)
@@ -29,6 +35,42 @@ struct IslandContainerView: View {
         TimelineStyle.from(timelineStyleRawValue)
     }
 
+    private var islandVisibilityMode: IslandVisibilityMode {
+        IslandVisibilityMode.from(islandVisibilityModeRawValue)
+    }
+
+    private var artworkThemeColor: NSColor? {
+        guard dynamicArtworkTheming,
+              let artworkImage = viewModel.snapshot.artwork,
+              let dominantColor = ArtworkColorExtractor.dominantColor(from: artworkImage)
+        else {
+            return nil
+        }
+
+        let nsColor = NSColor(dominantColor).usingColorSpace(.deviceRGB) ?? NSColor(dominantColor)
+        guard enhancedArtworkThemingEnabled else {
+            return nsColor
+        }
+
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        nsColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+
+        let tunedSaturation = max(0.25, min(0.68, saturation * 0.86))
+        let tunedBrightness = effectiveColorScheme == .dark
+            ? max(0.34, min(0.82, brightness * 0.9))
+            : max(0.5, min(0.92, brightness * 1.06))
+
+        return NSColor(
+            hue: hue,
+            saturation: tunedSaturation,
+            brightness: tunedBrightness,
+            alpha: 1.0
+        )
+    }
+
     private var islandBaseFillStyle: AnyShapeStyle {
         if glassThemeStyle == .clear {
             if effectiveColorScheme == .dark {
@@ -41,14 +83,13 @@ struct IslandContainerView: View {
     }
 
     private var islandTintColor: Color {
-        // If artwork theming is enabled and we have artwork, use extracted color
-        if dynamicArtworkTheming, let artworkImage = viewModel.snapshot.artwork {
-            if let dominantColor = ArtworkColorExtractor.dominantColor(from: artworkImage) {
-                return dominantColor.opacity(0.6)
-            }
+        if let artworkThemeColor {
+            let opacity = enhancedArtworkThemingEnabled
+                ? (effectiveColorScheme == .dark ? 0.5 : 0.38)
+                : 0.6
+            return Color(artworkThemeColor).opacity(opacity)
         }
 
-        // Fall back to default theme color
         if glassThemeStyle == .clear {
             return effectiveColorScheme == .dark ? Color.white.opacity(0.035) : Color.white.opacity(0.08)
         }
@@ -57,6 +98,13 @@ struct IslandContainerView: View {
     }
 
     private var islandBorderColor: Color {
+        if enhancedArtworkThemingEnabled, let artworkThemeColor {
+            let rgbColor = artworkThemeColor.usingColorSpace(.deviceRGB) ?? artworkThemeColor
+            let luminance = 0.2126 * rgbColor.redComponent + 0.7152 * rgbColor.greenComponent + 0.0722 * rgbColor.blueComponent
+            let alpha = luminance < 0.52 ? 0.34 : 0.2
+            return Color(artworkThemeColor).opacity(alpha)
+        }
+
         if glassThemeStyle == .clear {
             return effectiveColorScheme == .dark ? Color.white.opacity(0.26) : Color.black.opacity(0.16)
         }
@@ -65,6 +113,10 @@ struct IslandContainerView: View {
     }
 
     private var islandGlowColor: Color {
+        if enhancedArtworkThemingEnabled, let artworkThemeColor {
+            return Color(artworkThemeColor).opacity(effectiveColorScheme == .dark ? 0.2 : 0.14)
+        }
+
         if glassThemeStyle == .clear {
             return effectiveColorScheme == .dark ? Color.white.opacity(0.035) : Color.white.opacity(0.1)
         }
@@ -73,6 +125,10 @@ struct IslandContainerView: View {
     }
 
     private var islandShadowColor: Color {
+        if enhancedArtworkThemingEnabled, let artworkThemeColor {
+            return Color(artworkThemeColor).opacity(effectiveColorScheme == .dark ? 0.28 : 0.18)
+        }
+
         if glassThemeStyle == .clear {
             return IslandGlassTheme.shadowColor(for: effectiveColorScheme).opacity(0.35)
         }
@@ -89,6 +145,37 @@ struct IslandContainerView: View {
         case .light:
             return .light
         }
+    }
+
+    private var resolvedPrimaryTextColor: Color {
+        guard enhancedArtworkThemingEnabled, let artworkThemeColor else {
+            return IslandGlassTheme.primaryTextColor(for: effectiveColorScheme)
+        }
+
+        let rgbColor = artworkThemeColor.usingColorSpace(.deviceRGB) ?? artworkThemeColor
+        let luminance = 0.2126 * rgbColor.redComponent + 0.7152 * rgbColor.greenComponent + 0.0722 * rgbColor.blueComponent
+        return luminance < 0.48 ? .white : Color.black.opacity(0.86)
+    }
+
+    private var resolvedSecondaryTextColor: Color {
+        guard enhancedArtworkThemingEnabled, let artworkThemeColor else {
+            return IslandGlassTheme.secondaryTextColor(for: effectiveColorScheme)
+        }
+
+        let rgbColor = artworkThemeColor.usingColorSpace(.deviceRGB) ?? artworkThemeColor
+        let luminance = 0.2126 * rgbColor.redComponent + 0.7152 * rgbColor.greenComponent + 0.0722 * rgbColor.blueComponent
+        return luminance < 0.48 ? Color.white.opacity(0.75) : Color.black.opacity(0.58)
+    }
+
+    private var effectiveIslandOpacity: Double {
+        guard idleDimEnabled else { return islandOpacity }
+        guard islandVisibilityMode != .alwaysExpanded, !viewModel.isExpanded else { return islandOpacity }
+
+        let baseIdleThreshold: TimeInterval = focusAwareBehaviorEnabled ? 3.5 : 8.0
+        let idleFor = currentTimestamp.timeIntervalSince(lastInteractionDate)
+        guard idleFor >= baseIdleThreshold else { return islandOpacity }
+
+        return max(0.34, islandOpacity * 0.58)
     }
 
     var body: some View {
@@ -125,6 +212,9 @@ struct IslandContainerView: View {
                     .contentShape(Rectangle())
                     .onHover { hovering in
                         isExpandedContentHovering = hovering
+                        if hovering {
+                            lastInteractionDate = Date()
+                        }
                         updateHoverState()
                     }
                     .allowsHitTesting(true)
@@ -139,9 +229,14 @@ struct IslandContainerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(IslandAnimation.expand, value: viewModel.isExpanded)
         .preferredColorScheme(effectiveColorScheme)
-        .opacity(islandOpacity)
+        .opacity(effectiveIslandOpacity)
         .onAppear {
             systemAppearanceObserver.refresh()
+            lastInteractionDate = Date()
+            currentTimestamp = Date()
+        }
+        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { timestamp in
+            currentTimestamp = timestamp
         }
     }
 
@@ -171,7 +266,7 @@ struct IslandContainerView: View {
             VStack(alignment: .leading, spacing: 5) {
                 ScrollingLineText(
                     text: viewModel.snapshot.title,
-                    color: IslandGlassTheme.primaryTextColor(for: effectiveColorScheme),
+                    color: resolvedPrimaryTextColor,
                     fontSize: 13,
                     fontWeight: .semibold,
                     scrollSpeed: 28,
@@ -181,7 +276,7 @@ struct IslandContainerView: View {
 
                 ScrollingSubtitleText(
                     text: viewModel.snapshot.artist,
-                    color: IslandGlassTheme.secondaryTextColor(for: effectiveColorScheme)
+                    color: resolvedSecondaryTextColor
                 )
                 .help(viewModel.snapshot.artist)
 
@@ -196,7 +291,7 @@ struct IslandContainerView: View {
                     Text(formattedDuration)
                 }
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(IslandGlassTheme.secondaryTextColor(for: effectiveColorScheme))
+                .foregroundStyle(resolvedSecondaryTextColor)
             }
             .padding(.top, 35)
             .frame(maxWidth: textColumnMaxWidth, alignment: .leading)
@@ -217,7 +312,7 @@ struct IslandContainerView: View {
                     } label: {
                         Image(systemName: "gearshape")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(IslandGlassTheme.secondaryTextColor(for: effectiveColorScheme))
+                                .foregroundStyle(resolvedSecondaryTextColor)
                             .frame(width: 20, height: 20)
                     }
                     .buttonStyle(.plain)
@@ -285,10 +380,16 @@ struct IslandContainerView: View {
     }
 
     private func updateHoverState() {
+        if islandVisibilityMode != .auto {
+            viewModel.setHovering(false)
+            return
+        }
+
         let shouldExpand = isExpandedContentHovering
 
         if shouldExpand {
             collapseWorkItem?.cancel()
+            lastInteractionDate = Date()
             viewModel.setHovering(true)
             return
         }

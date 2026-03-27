@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum GestureOnboardingStep: Int {
@@ -23,6 +24,7 @@ final class IslandViewModel: ObservableObject {
     private var lockedDuration: TimeInterval = 0
     private var lockedProgress: Double = 0
     private var forcedPlayingState: Bool?
+    private var autoCollapseTask: Task<Void, Never>?
 
     init() {
         startPolling()
@@ -30,6 +32,7 @@ final class IslandViewModel: ObservableObject {
 
     deinit {
         pollingTask?.cancel()
+        autoCollapseTask?.cancel()
     }
 
     var isPreferredSourceActive: Bool {
@@ -42,11 +45,22 @@ final class IslandViewModel: ObservableObject {
     }
 
     func setHovering(_ hovering: Bool) {
-        withAnimation(hovering ? IslandAnimation.expand : IslandAnimation.collapse) {
-            isExpanded = hovering
+        switch visibilityMode {
+        case .alwaysExpanded:
+            withAnimation(IslandAnimation.expand) {
+                isExpanded = true
+            }
+        case .alwaysVisible:
+            withAnimation(IslandAnimation.collapse) {
+                isExpanded = false
+            }
+        case .auto:
+            withAnimation(hovering ? IslandAnimation.expand : IslandAnimation.collapse) {
+                isExpanded = hovering
+            }
         }
 
-        if hovering {
+        if hovering, visibilityMode == .auto {
             advanceOnboardingAfterHover()
         }
     }
@@ -111,7 +125,8 @@ final class IslandViewModel: ObservableObject {
             guard let self else { return }
 
             while !Task.isCancelled {
-                var latest = await self.nowPlayingService.currentSnapshot(previous: self.snapshot)
+                let previousSnapshot = self.snapshot
+                var latest = await self.nowPlayingService.currentSnapshot(previous: previousSnapshot)
 
                 if let lockUntil = self.commandLockUntil,
                    let forcedState = self.forcedPlayingState,
@@ -130,10 +145,85 @@ final class IslandViewModel: ObservableObject {
                 }
 
                 self.snapshot = latest
+                self.handleSmartAutoExpand(previous: previousSnapshot, latest: latest)
                 self.refreshOnboardingStepFromCurrentSource()
                 try? await Task.sleep(for: .milliseconds(250))
             }
         }
+    }
+
+    private var visibilityMode: IslandVisibilityMode {
+        IslandVisibilityMode.from(UserDefaults.standard.string(forKey: "islandVisibilityMode") ?? IslandVisibilityMode.auto.rawValue)
+    }
+
+    private var smartAutoExpandEnabled: Bool {
+        if UserDefaults.standard.object(forKey: "smartAutoExpandEnabled") == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: "smartAutoExpandEnabled")
+    }
+
+    private var focusAwareBehaviorEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "focusAwareBehaviorEnabled")
+    }
+
+    private func handleSmartAutoExpand(previous: NowPlayingSnapshot, latest: NowPlayingSnapshot) {
+        guard smartAutoExpandEnabled else { return }
+        guard visibilityMode != .alwaysExpanded else {
+            isExpanded = true
+            return
+        }
+
+        if focusAwareBehaviorEnabled, shouldSuppressAttentionExpansion {
+            return
+        }
+
+        let titleChanged = !latest.title.isEmpty && previous.title != latest.title
+        let sourceChanged = previous.source != latest.source && latest.source != .none
+        let playbackChanged = previous.isPlaying != latest.isPlaying
+
+        guard titleChanged || sourceChanged || playbackChanged else { return }
+
+        withAnimation(IslandAnimation.expand) {
+            isExpanded = true
+        }
+
+        autoCollapseTask?.cancel()
+        autoCollapseTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3.2))
+            guard let self, !Task.isCancelled else { return }
+
+            await MainActor.run {
+                switch self.visibilityMode {
+                case .auto, .alwaysVisible:
+                    withAnimation(IslandAnimation.collapse) {
+                        self.isExpanded = false
+                    }
+                case .alwaysExpanded:
+                    withAnimation(IslandAnimation.expand) {
+                        self.isExpanded = true
+                    }
+                }
+            }
+        }
+    }
+
+    private var shouldSuppressAttentionExpansion: Bool {
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
+            return false
+        }
+
+        let mediaBundleIDs: Set<String> = [
+            "com.spotify.client",
+            "com.apple.Music",
+            "com.apple.Safari",
+            "com.google.Chrome",
+            "com.brave.Browser",
+            "com.operasoftware.Opera",
+            "com.operasoftware.OperaGX"
+        ]
+
+        return !mediaBundleIDs.contains(bundleID)
     }
 
     private func refreshOnboardingStepFromCurrentSource() {

@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## v1.0.6 - 2026-03-27
+
+### Added
+- Island visibility mode selector: Auto, Always Visible, and Always Expanded.
+- Smart auto-expand for track/source/playback changes with timed recollapse.
+- Focus-aware behavior option to reduce attention expansion outside media workflows.
+- Enhanced artwork theming toggle with dominant-color tinting.
+- Idle dim behavior for reduced visual intensity after inactivity.
+- Click-through option for collapsed island mode.
+- Auto-hide option while macOS fullscreen apps are active.
+
+### Changed
+- Settings UI reorganized into dedicated sections to fit fixed window constraints:
+	- Appearance
+	- Island Behavior
+	- Island Theming
+	- Gestures
+	- Automation Permissions
+- Settings main pane now scrolls to ensure all controls remain accessible.
+- Artwork-based text contrast now adapts using luminance-aware color resolution.
+
+### Removed
+- Non-functional glass blur control and related runtime setting storage.
+- Unused media-key handling remnants and dead seek code paths from earlier experiments.
+- Unused Bluetooth placeholder service module.
+
 ## v1.0.5 - 2026-03-27
 
 ### Added
