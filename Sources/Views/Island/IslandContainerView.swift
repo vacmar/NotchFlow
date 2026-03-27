@@ -7,6 +7,8 @@ struct IslandContainerView: View {
     @AppStorage("glassThemeStyle") private var glassThemeStyleRawValue = GlassThemeStyle.frosted.rawValue
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
     @AppStorage("timelineStyle") private var timelineStyleRawValue = TimelineStyle.solid.rawValue
+    @AppStorage("islandOpacity") private var islandOpacity = 1.0
+    @AppStorage("dynamicArtworkTheming") private var dynamicArtworkTheming = true
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
     @State private var isExpandedContentHovering = false
     @State private var collapseWorkItem: DispatchWorkItem?
@@ -39,6 +41,14 @@ struct IslandContainerView: View {
     }
 
     private var islandTintColor: Color {
+        // If artwork theming is enabled and we have artwork, use extracted color
+        if dynamicArtworkTheming, let artworkImage = viewModel.snapshot.artwork {
+            if let dominantColor = ArtworkColorExtractor.dominantColor(from: artworkImage) {
+                return dominantColor.opacity(0.6)
+            }
+        }
+
+        // Fall back to default theme color
         if glassThemeStyle == .clear {
             return effectiveColorScheme == .dark ? Color.white.opacity(0.035) : Color.white.opacity(0.08)
         }
@@ -129,6 +139,7 @@ struct IslandContainerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(IslandAnimation.expand, value: viewModel.isExpanded)
         .preferredColorScheme(effectiveColorScheme)
+        .opacity(islandOpacity)
         .onAppear {
             systemAppearanceObserver.refresh()
         }

@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## v1.0.5 - 2026-03-27
+
+### Added
+- Dynamic artwork theming toggle with dominant-color tinting applied to the island surface.
+- Artwork color extraction utility for album art processing and caching.
+
+### Changed
+- Appearance settings spacing and layout adjusted to improve label clipping and header alignment.
+- Settings window height increased to avoid top-bar text collision.
+
+### Removed
+- Non-functional glass blur control and related runtime setting storage.
+- Unused media-key handling remnants and dead seek code paths from earlier experiments.
+- Unused Bluetooth placeholder service module.
+
 ## v1.0.3 - 2026-03-24
 
 ### Fixed

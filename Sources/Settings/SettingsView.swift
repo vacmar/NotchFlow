@@ -36,13 +36,15 @@ struct SettingsView: View {
     @AppStorage("glassThemeStyle") private var glassThemeStyleRawValue = GlassThemeStyle.frosted.rawValue
     @AppStorage("waveformStyle") private var waveformStyleRawValue = WaveformStyle.solid.rawValue
     @AppStorage("timelineStyle") private var timelineStyleRawValue = TimelineStyle.solid.rawValue
+    @AppStorage("islandOpacity") private var islandOpacity = 1.0
+    @AppStorage("dynamicArtworkTheming") private var dynamicArtworkTheming = true
     @State private var permissionStatuses: [PermissionStatus] = []
     @State private var refreshKey = UUID()
     @State private var lastRefreshedAt = Date()
     @State private var selectedPanel: SettingsPanel = .appearance
     @StateObject private var systemAppearanceObserver = SystemAppearanceObserver()
 
-    private let labelColumnWidth: CGFloat = 86
+    private let labelColumnWidth: CGFloat = 135
     private let rowHorizontalSpacing: CGFloat = 12
     private let appearanceRowSpacing: CGFloat = 16
     private let sectionBlockSpacing: CGFloat = 16
@@ -170,7 +172,7 @@ struct SettingsView: View {
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: 720, height: 640)
+        .frame(width: 720, height: 680)
         .background(settingsBackgroundColor)
         .onAppear {
             systemAppearanceObserver.refresh()
@@ -354,6 +356,48 @@ struct SettingsView: View {
                 }
 
                 Text("Choose Gradient for a gradient progress timeline, or copy waveform style with one click.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Island Opacity")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    HStack(spacing: 8) {
+                        Slider(value: $islandOpacity, in: 0.3...1.0, step: 0.05)
+                            .frame(width: 140)
+
+                        Text(String(format: "%.0f%%", islandOpacity * 100))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(secondaryTextColor)
+                            .frame(width: 45, alignment: .trailing)
+                    }
+                }
+
+                Text("Adjust the transparency of the island window")
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: rowHorizontalSpacing) {
+                    Text("Artwork Theming")
+                        .foregroundStyle(primaryTextColor)
+                        .frame(width: labelColumnWidth, alignment: .leading)
+
+                    Toggle("", isOn: $dynamicArtworkTheming)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                Text("Extract dominant color from album art for dynamic theming")
                     .font(.caption)
                     .foregroundStyle(secondaryTextColor)
                     .padding(.leading, labelColumnWidth + rowHorizontalSpacing)
